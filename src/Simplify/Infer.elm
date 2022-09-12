@@ -1,8 +1,6 @@
 module Simplify.Infer exposing
-    ( DeducedValue(..)
-    , Fact(..)
+    ( Fact(..)
     , Inferred(..)
-    , NumberRange
     , Resources
     , belongsTo
     , deduceNewFacts
@@ -11,10 +9,8 @@ module Simplify.Infer exposing
     , get
     , infer
     , inferForIfCondition
-    , intersect
     , isBoolean
     , trueExpr
-    , unite
     )
 
 {-| Infers values from `if` conditions.
@@ -101,34 +97,21 @@ some work.
 -}
 
 import AssocList
+import Dict
 import Elm.Syntax.Expression as Expression exposing (Expression)
+import Elm.Syntax.Infix exposing (InfixDirection(..))
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range exposing (Range)
+import NumberRange exposing (NumberRange)
 import Review.ModuleNameLookupTable exposing (ModuleNameLookupTable)
+import Value exposing (BooleanValue(..), Value(..))
 
 
 type Inferred
     = Inferred
         { facts : List Fact
-        , deduced : AssocList.Dict Expression DeducedValue
+        , deduced : AssocList.Dict Expression Value
         }
-
-
-type DeducedValue
-    = DBool Bool (List Bool) -- We could just have a tri-state, but this is more similar to the others and more comfortable
-    | DNumber NumberRange (List NumberRange)
-    | DStringOneOf String (List String)
-    | DStringNeitherOf String (List String)
-    | DCharOneOf Char (List Char)
-    | DCharNeitherOf Char (List Char)
-
-
-type alias NumberRange =
-    { from : Float
-    , fromIncluded : Bool
-    , to : Float
-    , toIncluded : Bool
-    }
 
 
 infinity : Float
@@ -170,17 +153,18 @@ empty =
 
 get : Expression -> Inferred -> Maybe Expression
 get expr (Inferred inferred) =
-    AssocList.get expr inferred.deduced
+    expr
+        |> Value.eval inferred.deduced
         |> Maybe.andThen
             (\value ->
                 case value of
-                    DBool True [] ->
-                        Just <| trueExpr
+                    DBool DTrue ->
+                        Just trueExpr
 
-                    DBool False [] ->
-                        Just <| falseExpr
+                    DBool DFalse ->
+                        Just falseExpr
 
-                    DBool _ _ ->
+                    DBool DTrueOrFalse ->
                         Nothing
 
                     DNumber { from, fromIncluded, to, toIncluded } [] ->
@@ -210,34 +194,29 @@ get expr (Inferred inferred) =
 
                     DCharNeitherOf _ _ ->
                         Nothing
+
+                    DRecord _ ->
+                        Nothing
+
+                    DUnit ->
+                        Just Expression.UnitExpr
             )
 
 
 isBoolean : Expression -> Inferred -> Maybe Bool
 isBoolean expr (Inferred inferred) =
-    AssocList.get expr inferred.deduced
+    expr
+        |> Value.eval inferred.deduced
         |> Maybe.andThen
             (\value ->
                 case value of
-                    DBool b [] ->
-                        Just b
+                    DBool DTrue ->
+                        Just True
 
-                    DBool _ _ ->
-                        Nothing
+                    DBool DFalse ->
+                        Just False
 
-                    DNumber _ _ ->
-                        Nothing
-
-                    DStringOneOf _ _ ->
-                        Nothing
-
-                    DCharOneOf _ _ ->
-                        Nothing
-
-                    DStringNeitherOf _ _ ->
-                        Nothing
-
-                    DCharNeitherOf _ _ ->
+                    _ ->
                         Nothing
             )
 
@@ -345,7 +324,7 @@ injectFacts newFacts (Inferred inferred) =
                     newFactsToVisit =
                         deduceNewFacts newFact inferred.facts
 
-                    deducedFromNewFact : Maybe ( Expression, DeducedValue )
+                    deducedFromNewFact : Maybe ( Expression, Value )
                     deducedFromNewFact =
                         case newFact of
                             Equals a b ->
@@ -353,7 +332,10 @@ injectFacts newFacts (Inferred inferred) =
 
                             NotEquals a b ->
                                 equalsFact a b
-                                    |> Maybe.andThen notDeduced
+                                    |> Maybe.andThen
+                                        (\( e, f ) ->
+                                            Maybe.map (Tuple.pair e) (notDeduced f)
+                                        )
 
                             LessThan _ _ ->
                                 Nothing
@@ -384,7 +366,7 @@ deduceNewFacts : Fact -> List Fact -> List Fact
 deduceNewFacts newFact facts =
     case newFact of
         Equals factTarget factValue ->
-            case expressionToDeduced factValue of
+            case Value.eval AssocList.empty factValue of
                 Just value ->
                     List.concatMap (mergeEqualFacts ( factTarget, value )) facts
 
@@ -404,71 +386,43 @@ deduceNewFacts newFact facts =
             []
 
 
-equalsFact : Expression -> Expression -> Maybe ( Expression, DeducedValue )
+equalsFact : Expression -> Expression -> Maybe ( Expression, Value )
 equalsFact a b =
-    case expressionToDeduced a of
+    case Value.eval AssocList.empty a of
         Just deducedValue ->
             Just ( b, deducedValue )
 
         Nothing ->
-            case expressionToDeduced b of
-                Just deducedValue ->
-                    Just ( a, deducedValue )
-
-                Nothing ->
-                    Nothing
+            Maybe.map (Tuple.pair a) (Value.eval AssocList.empty b)
 
 
-expressionToDeduced : Expression -> Maybe DeducedValue
-expressionToDeduced expression =
-    case expression of
-        Expression.FunctionOrValue [ "Basics" ] "True" ->
-            Just (DBool True [])
-
-        Expression.FunctionOrValue [ "Basics" ] "False" ->
-            Just (DBool False [])
-
-        Expression.Floatable float ->
-            Just
-                (DNumber
-                    { from = float
-                    , to = float
-                    , fromIncluded = True
-                    , toIncluded = True
-                    }
-                    []
-                )
-
-        Expression.Literal string ->
-            Just (DStringOneOf string [])
-
-        Expression.CharLiteral char ->
-            Just (DCharOneOf char [])
-
-        _ ->
-            Nothing
-
-
-notDeduced : ( a, DeducedValue ) -> Maybe ( a, DeducedValue )
-notDeduced ( a, deducedValue ) =
+notDeduced : Value -> Maybe Value
+notDeduced deducedValue =
     case deducedValue of
-        DBool option options ->
-            Just ( a, DBool (not option) (List.map not options) )
+        DBool DTrue ->
+            Just (DBool DFalse)
+
+        DBool DFalse ->
+            Just (DBool DTrue)
+
+        (DBool DTrueOrFalse) as db ->
+            Just db
 
         DStringOneOf s o ->
-            Just ( a, DStringNeitherOf s o )
+            Just (DStringNeitherOf s o)
 
         DStringNeitherOf s o ->
-            Just ( a, DStringOneOf s o )
+            Just (DStringOneOf s o)
 
         DCharOneOf s o ->
-            Just ( a, DCharNeitherOf s o )
+            Just (DCharNeitherOf s o)
 
         DCharNeitherOf s o ->
-            Just ( a, DCharOneOf s o )
+            Just (DCharOneOf s o)
 
         DNumber s o ->
             let
+                invertRange : NumberRange -> List NumberRange
                 invertRange { from, to, fromIncluded, toIncluded } =
                     (if from > negInfinity then
                         [ if fromIncluded then
@@ -493,26 +447,10 @@ notDeduced ( a, deducedValue ) =
                                 []
                            )
 
+                step : List NumberRange -> List NumberRange -> List NumberRange
                 step l r =
-                    List.concatMap (\le -> List.filterMap (intersect le) r) l
-                        -- We have a list of ranges, if we sort them by `from` we'll be able to merge them (if possible) by just considering adjacent ones
-                        |> List.sortBy (\{ from } -> -from)
-                        |> List.foldl
-                            (\e acc ->
-                                case acc of
-                                    [] ->
-                                        [ e ]
-
-                                    last :: rest ->
-                                        case unite e last of
-                                            Just u ->
-                                                u :: rest
-
-                                            Nothing ->
-                                                e :: acc
-                            )
-                            []
-                        |> List.reverse
+                    List.concatMap (\le -> List.filterMap (NumberRange.intersect le) r) l
+                        |> NumberRange.mergeList
             in
             case
                 o
@@ -523,32 +461,19 @@ notDeduced ( a, deducedValue ) =
                     Nothing
 
                 h :: t ->
-                    Just ( a, DNumber h t )
+                    Just (DNumber h t)
 
+        DRecord fields ->
+            fields
+                |> Dict.toList
+                |> List.filterMap (\( k, v ) -> Maybe.map (Tuple.pair k) (notDeduced v))
+                |> Dict.fromList
+                |> DRecord
+                |> Just
 
-unite : NumberRange -> NumberRange -> Maybe NumberRange
-unite l r =
-    if r.from < l.from then
-        unite r l
-
-    else if l.to < r.from || (l.to == r.from && not l.toIncluded && not r.fromIncluded) then
-        Nothing
-
-    else
-        Just
-            { from = l.from
-            , fromIncluded = l.fromIncluded || (l.from == r.from && r.fromIncluded)
-            , to = max l.to r.to
-            , toIncluded =
-                if l.to < r.to then
-                    r.toIncluded
-
-                else if l.to > r.to then
-                    l.toIncluded
-
-                else
-                    l.toIncluded || r.toIncluded
-            }
+        DUnit ->
+            -- This doesn't really make sense
+            Nothing
 
 
 lessThan : Float -> NumberRange
@@ -571,43 +496,13 @@ moreThanOrEquals float =
     { from = float, fromIncluded = True, to = infinity, toIncluded = False }
 
 
-intersect : NumberRange -> NumberRange -> Maybe NumberRange
-intersect lr rr =
-    let
-        ( from, fromIncluded ) =
-            if lr.from > rr.from then
-                ( lr.from, lr.fromIncluded )
-
-            else if lr.from < rr.from then
-                ( rr.from, rr.fromIncluded )
-
-            else
-                ( lr.from, lr.fromIncluded && rr.fromIncluded )
-
-        ( to, toIncluded ) =
-            if lr.to < rr.to then
-                ( lr.to, lr.toIncluded )
-
-            else if lr.to > rr.to then
-                ( rr.to, rr.toIncluded )
-
-            else
-                ( lr.to, lr.toIncluded && rr.toIncluded )
-    in
-    if from < to || (from == to && fromIncluded && toIncluded) then
-        Just { from = from, fromIncluded = fromIncluded, to = to, toIncluded = toIncluded }
-
-    else
-        Nothing
-
-
 belongsTo : NumberRange -> Float -> Bool
 belongsTo { from, to, fromIncluded, toIncluded } float =
     (float > from || (float == from && fromIncluded))
         && (float < to || (float == to && toIncluded))
 
 
-mergeEqualFacts : ( Expression, DeducedValue ) -> Fact -> List Fact
+mergeEqualFacts : ( Expression, Value ) -> Fact -> List Fact
 mergeEqualFacts equalFact fact =
     case fact of
         Or left right ->
@@ -620,7 +515,7 @@ mergeEqualFacts equalFact fact =
             []
 
 
-ifSatisfy : ( Expression, DeducedValue ) -> ( Fact, a ) -> Maybe a
+ifSatisfy : ( Expression, Value ) -> ( Fact, a ) -> Maybe a
 ifSatisfy ( target, value ) ( targetFact, otherFact ) =
     case targetFact of
         Equals factTarget factValue ->
@@ -634,13 +529,13 @@ ifSatisfy ( target, value ) ( targetFact, otherFact ) =
             Nothing
 
 
-areIncompatible : DeducedValue -> Expression -> Bool
+areIncompatible : Value -> Expression -> Bool
 areIncompatible value factValue =
     case ( value, factValue ) of
-        ( DBool True [], Expression.FunctionOrValue [ "Basics" ] "False" ) ->
+        ( DBool DTrue, Expression.FunctionOrValue [ "Basics" ] "False" ) ->
             True
 
-        ( DBool False [], Expression.FunctionOrValue [ "Basics" ] "True" ) ->
+        ( DBool DFalse, Expression.FunctionOrValue [ "Basics" ] "True" ) ->
             True
 
         ( DNumber range ranges, Expression.Floatable factFloat ) ->
@@ -720,6 +615,7 @@ inferOnLessThan (Node _ expr) (Node _ other) shouldBe =
     case expr of
         Expression.Integer int ->
             let
+                floatExpression : Expression
                 floatExpression =
                     Expression.Floatable (Basics.toFloat int)
             in
@@ -731,6 +627,7 @@ inferOnLessThan (Node _ expr) (Node _ other) shouldBe =
 
         Expression.Floatable float ->
             let
+                floatExpression : Expression
                 floatExpression =
                     Expression.Floatable float
             in
@@ -749,6 +646,7 @@ inferOnLessThanOrEqual (Node _ expr) (Node _ other) shouldBe =
     case expr of
         Expression.Integer int ->
             let
+                floatExpression : Expression
                 floatExpression =
                     Expression.Floatable (Basics.toFloat int)
             in
@@ -760,6 +658,7 @@ inferOnLessThanOrEqual (Node _ expr) (Node _ other) shouldBe =
 
         Expression.Floatable float ->
             let
+                floatExpression : Expression
                 floatExpression =
                     Expression.Floatable float
             in

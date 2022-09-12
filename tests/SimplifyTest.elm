@@ -2898,7 +2898,7 @@ a = if True then 1 else 2
                         [ Review.Test.error
                             { message = "The condition will always evaluate to True"
                             , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
-                            , under = "if"
+                            , under = "True"
                             }
                             |> Review.Test.whenFixed """module A exposing (..)
 a = 1
@@ -2914,7 +2914,7 @@ a = if False then 1 else 2
                         [ Review.Test.error
                             { message = "The condition will always evaluate to False"
                             , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
-                            , under = "if"
+                            , under = "False"
                             }
                             |> Review.Test.whenFixed """module A exposing (..)
 a = 2
@@ -2937,7 +2937,7 @@ a = if condition then True else False
                         [ Review.Test.error
                             { message = "The if expression's value is the same as the condition"
                             , details = [ "The expression can be replaced by the condition." ]
-                            , under = "if"
+                            , under = "condition"
                             }
                             |> Review.Test.whenFixed """module A exposing (..)
 a = condition
@@ -3032,9 +3032,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to True"
                             , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
-                            , under = "if"
+                            , under = "x"
                             }
-                            |> Review.Test.atExactly { start = { row = 4, column = 5 }, end = { row = 4, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 4, column = 8 }, end = { row = 4, column = 9 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x then
@@ -3060,9 +3060,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to True"
                             , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
-                            , under = "if"
+                            , under = "x"
                             }
-                            |> Review.Test.atExactly { start = { row = 4, column = 5 }, end = { row = 4, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 4, column = 8 }, end = { row = 4, column = 9 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if (x) then
@@ -3088,9 +3088,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to False"
                             , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
-                            , under = "if"
+                            , under = "x"
                             }
-                            |> Review.Test.atExactly { start = { row = 4, column = 5 }, end = { row = 4, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 4, column = 8 }, end = { row = 4, column = 9 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if not x then
@@ -3116,9 +3116,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to False"
                             , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
-                            , under = "if"
+                            , under = "x"
                             }
-                            |> Review.Test.atExactly { start = { row = 4, column = 5 }, end = { row = 4, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 4, column = 8 }, end = { row = 4, column = 9 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if not <| x then
@@ -3174,9 +3174,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to False"
                             , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
-                            , under = "if"
+                            , under = "x"
                             }
-                            |> Review.Test.atExactly { start = { row = 6, column = 5 }, end = { row = 6, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 6, column = 8 }, end = { row = 6, column = 9 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x then
@@ -3265,9 +3265,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to True"
                             , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
-                            , under = "if"
+                            , under = "x"
                             }
-                            |> Review.Test.atExactly { start = { row = 5, column = 7 }, end = { row = 5, column = 9 } }
+                            |> Review.Test.atExactly { start = { row = 5, column = 10 }, end = { row = 5, column = 11 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x then
@@ -3296,9 +3296,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to True"
                             , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
-                            , under = "if"
+                            , under = "x"
                             }
-                            |> Review.Test.atExactly { start = { row = 4, column = 5 }, end = { row = 4, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 4, column = 8 }, end = { row = 4, column = 9 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x && y then
@@ -3324,9 +3324,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to False"
                             , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
-                            , under = "if"
+                            , under = "x"
                             }
-                            |> Review.Test.atExactly { start = { row = 6, column = 5 }, end = { row = 6, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 6, column = 8 }, end = { row = 6, column = 9 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x || y then
@@ -3378,18 +3378,15 @@ a =
                     |> Review.Test.run (rule defaults)
                     |> Review.Test.expectErrors
                         [ Review.Test.error
-                            { message = "Comparison is always True"
-                            , details = sameThingOnBothSidesDetails "True"
+                            { message = "The condition will always evaluate to True"
+                            , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
                             , under = "x == 1"
                             }
                             |> Review.Test.atExactly { start = { row = 4, column = 8 }, end = { row = 4, column = 14 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x == 1 then
-    if True then
-      1
-    else
-      2
+    1
   else
     3
 """
@@ -3440,18 +3437,14 @@ a =
                     |> Review.Test.run (rule defaults)
                     |> Review.Test.expectErrors
                         [ Review.Test.error
-                            { message = "Comparison is always False"
-                            , details = sameThingOnBothSidesDetails "False"
+                            { message = "The condition will always evaluate to False"
+                            , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
                             , under = "x == \"b\""
                             }
-                            |> Review.Test.atExactly { start = { row = 4, column = 8 }, end = { row = 4, column = 16 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x == "a" then
-    if False then
-      1
-    else
-      2
+    2
   else
     3
 """
@@ -3471,17 +3464,14 @@ a =
                     |> Review.Test.run (rule defaults)
                     |> Review.Test.expectErrors
                         [ Review.Test.error
-                            { message = "Comparison is always False"
-                            , details = sameThingOnBothSidesDetails "False"
+                            { message = "The condition will always evaluate to False"
+                            , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
                             , under = "item.name == \"Sulfuras, Hand of Ragnaros\""
                             }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if item.name == "Aged Brie" then
-    if False then
-      1
-    else
-      2
+    2
   else
     3
 """
@@ -3501,17 +3491,14 @@ a =
                     |> Review.Test.run (rule defaults)
                     |> Review.Test.expectErrors
                         [ Review.Test.error
-                            { message = "Comparison is always False"
-                            , details = sameThingOnBothSidesDetails "False"
+                            { message = "The condition will always evaluate to False"
+                            , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
                             , under = "x == 2"
                             }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x == 1 then
-    if False then
-      1
-    else
-      2
+    2
   else
     3
 """
@@ -3546,9 +3533,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to True"
                             , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
-                            , under = "if"
+                            , under = "x /= 1"
                             }
-                            |> Review.Test.atExactly { start = { row = 4, column = 5 }, end = { row = 4, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 4, column = 8 }, end = { row = 4, column = 14 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x /= 1 then
@@ -3571,8 +3558,8 @@ a =
                     |> Review.Test.run (rule defaults)
                     |> Review.Test.expectErrors
                         [ Review.Test.error
-                            { message = "Comparison is always False"
-                            , details = sameThingOnBothSidesDetails "False"
+                            { message = "The condition will always evaluate to False"
+                            , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
                             , under = "x /= 1"
                             }
                             |> Review.Test.atExactly { start = { row = 5, column = 11 }, end = { row = 5, column = 17 } }
@@ -3580,10 +3567,7 @@ a =
 a =
   if x /= 1 then
     1
-  else if False then
-    2
-  else
-    3
+  else 3
 """
                         ]
         , test "should remove branches where the condition always matches (== in else)" <|
@@ -3600,18 +3584,15 @@ a =
                     |> Review.Test.run (rule defaults)
                     |> Review.Test.expectErrors
                         [ Review.Test.error
-                            { message = "Comparison is always True"
-                            , details = sameThingOnBothSidesDetails "True"
+                            { message = "The condition will always evaluate to True"
+                            , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
                             , under = "x == 1"
                             }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x /= 1 then
     1
-  else if True then
-    2
-  else
-    3
+  else 2
 """
                         ]
         , test "should remove branches where the condition never matches (literal on the left using ==, second if)" <|
@@ -3630,9 +3611,8 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to False"
                             , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
-                            , under = "if"
+                            , under = "1 == x"
                             }
-                            |> Review.Test.atExactly { start = { row = 5, column = 8 }, end = { row = 5, column = 10 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if x == 1 then
@@ -3656,9 +3636,8 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to False"
                             , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
-                            , under = "if"
+                            , under = "x == 1"
                             }
-                            |> Review.Test.atExactly { start = { row = 5, column = 8 }, end = { row = 5, column = 10 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if 1 == x then
@@ -3680,18 +3659,15 @@ a =
                     |> Review.Test.run (rule defaults)
                     |> Review.Test.expectErrors
                         [ Review.Test.error
-                            { message = "Comparison is always True"
-                            , details = sameThingOnBothSidesDetails "True"
+                            { message = "The condition will always evaluate to True"
+                            , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
                             , under = "x == 1"
                             }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if 1 /= x then
     1
-  else if True then
-    2
-  else
-    3
+  else 2
 """
                         ]
         , test "should remove branches where the condition never matches (&&)" <|
@@ -3736,9 +3712,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to False"
                             , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
-                            , under = "if"
+                            , under = "a"
                             }
-                            |> Review.Test.atExactly { start = { row = 5, column = 8 }, end = { row = 5, column = 10 } }
+                            |> Review.Test.atExactly { start = { row = 5, column = 11 }, end = { row = 5, column = 12 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if a || b then
@@ -3808,9 +3784,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to False"
                             , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
-                            , under = "if"
+                            , under = "b"
                             }
-                            |> Review.Test.atExactly { start = { row = 6, column = 5 }, end = { row = 6, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 6, column = 8 }, end = { row = 6, column = 9 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if a && b then
@@ -3841,9 +3817,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to True"
                             , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
-                            , under = "if"
+                            , under = "b"
                             }
-                            |> Review.Test.atExactly { start = { row = 5, column = 7 }, end = { row = 5, column = 9 } }
+                            |> Review.Test.atExactly { start = { row = 5, column = 10 }, end = { row = 5, column = 11 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if a || b then
@@ -3903,9 +3879,9 @@ a =
                         [ Review.Test.error
                             { message = "The condition will always evaluate to True"
                             , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
-                            , under = "if"
+                            , under = "b"
                             }
-                            |> Review.Test.atExactly { start = { row = 6, column = 5 }, end = { row = 6, column = 7 } }
+                            |> Review.Test.atExactly { start = { row = 6, column = 8 }, end = { row = 6, column = 9 } }
                             |> Review.Test.whenFixed """module A exposing (..)
 a =
   if not (a || b) then

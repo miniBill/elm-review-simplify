@@ -391,36 +391,6 @@ Below is the list of all kinds of simplifications this rule applies.
     --> [ x, y ]
 
 
-    List.concat [ [ a, b ], [ c ] ]
-    --> [ a, b, c ]
-
-    List.concat [ a, [ 1 ], [ 2 ] ]
-    --> List.concat [ a, [ 1, 2 ] ]
-
-    List.concatMap identity x
-    --> List.concat list
-
-    List.concatMap identity
-    --> List.concat
-
-    List.concatMap (\a -> a) list
-    --> List.concat list
-
-    List.concatMap (\a -> [ b ]) list
-    --> List.map (\a -> b) list
-
-    List.concatMap fn [ x ]
-    --> fn x
-
-    List.concatMap (always []) list
-    --> []
-
-    List.concat (List.map f x)
-    --> List.concatMap f x
-
-    List.indexedMap (\_ value -> f value) list
-    --> List.map (\value -> f value) list
-
     List.isEmpty []
     --> True
 
@@ -4921,7 +4891,7 @@ ifChecks context nodeRange { condition, trueBranch, falseBranch } =
                     { message = "The condition will always evaluate to True"
                     , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
                     }
-                    (targetIfKeyword nodeRange)
+                    (Node.range condition)
                     [ Fix.removeRange
                         { start = nodeRange.start
                         , end = (Node.range trueBranch).start
@@ -4940,7 +4910,7 @@ ifChecks context nodeRange { condition, trueBranch, falseBranch } =
                     { message = "The condition will always evaluate to False"
                     , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
                     }
-                    (targetIfKeyword nodeRange)
+                    (Node.range condition)
                     [ Fix.removeRange
                         { start = nodeRange.start
                         , end = (Node.range falseBranch).start
@@ -4957,7 +4927,7 @@ ifChecks context nodeRange { condition, trueBranch, falseBranch } =
                             { message = "The if expression's value is the same as the condition"
                             , details = [ "The expression can be replaced by the condition." ]
                             }
-                            (targetIfKeyword nodeRange)
+                            (Node.range condition)
                             [ Fix.removeRange
                                 { start = nodeRange.start
                                 , end = (Node.range condition).start
