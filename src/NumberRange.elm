@@ -1,4 +1,4 @@
-module NumberRange exposing (NumberRange, intersect, isSingleton, merge, mergeList, minus, negate, plus, singleton)
+module NumberRange exposing (NumberRange, intersect, isSingleton, lessThan, merge, mergeList, minus, negate, plus, singleton)
 
 
 type alias NumberRange =
@@ -126,3 +126,15 @@ intersect lr rr =
 minus : NumberRange -> NumberRange -> NumberRange
 minus l r =
     plus l (negate r)
+
+
+lessThan : NumberRange -> NumberRange -> Maybe Bool
+lessThan l r =
+    if l.to < r.from || ((not l.toIncluded || not r.fromIncluded) && l.to == r.from) then
+        Just True
+
+    else if r.to < l.from || ((not l.toIncluded || not r.fromIncluded) && r.to == l.from) then
+        Just False
+
+    else
+        Nothing

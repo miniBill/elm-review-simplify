@@ -22,7 +22,7 @@ type Value
 type BooleanValue
     = DTrue
     | DFalse
-    | DTrueOrFalse
+    | DTrueOrFalse String
 
 
 union : Value -> Value -> Maybe Value
@@ -118,74 +118,11 @@ eval deduced expr =
                                         )
                             )
 
-                Expression.OperatorApplication "+" Left (Node _ l) (Node _ r) ->
-                    numberOperation2 deduced NumberRange.plus l r
-
-                Expression.OperatorApplication "-" Left (Node _ l) (Node _ r) ->
-                    numberOperation2 deduced NumberRange.minus l r
-
-                Expression.OperatorApplication "*" Left _ _ ->
-                    -- (Node _ l) (Node _ r) ->
-                    -- TODO implement multiplication
-                    -- numberOperation2 deduced NumberRange.by l r
-                    Nothing
-
-                Expression.OperatorApplication "/" Left _ _ ->
-                    -- (Node _ l) (Node _ r) ->
-                    -- TODO implement division
-                    -- numberOperation2 deduced NumberRange.divide l r
-                    Nothing
+                Expression.OperatorApplication op assoc (Node _ l) (Node _ r) ->
+                    operatorEval deduced op assoc l r
 
                 Expression.Negation (Node _ c) ->
                     numberOperation1 deduced NumberRange.negate c
-
-                Expression.OperatorApplication "==" Non (Node _ l) (Node _ r) ->
-                    Maybe.map2
-                        (\lValue rValue ->
-                            DBool <| equals lValue rValue
-                        )
-                        (eval deduced l)
-                        (eval deduced r)
-
-                Expression.OperatorApplication "/=" Non (Node _ l) (Node _ r) ->
-                    Maybe.map2
-                        (\lValue rValue ->
-                            DBool <| boolValueNot <| equals lValue rValue
-                        )
-                        (eval deduced l)
-                        (eval deduced r)
-
-                Expression.OperatorApplication "||" Right (Node _ l) (Node _ r) ->
-                    case eval deduced l of
-                        Just (DBool DFalse) ->
-                            eval deduced r
-
-                        (Just (DBool DTrue)) as true ->
-                            true
-
-                        _ ->
-                            case eval deduced r of
-                                (Just (DBool DTrue)) as true ->
-                                    true
-
-                                _ ->
-                                    Just <| DBool DTrueOrFalse
-
-                Expression.OperatorApplication "&&" Right (Node _ l) (Node _ r) ->
-                    case eval deduced l of
-                        Just (DBool DTrue) ->
-                            eval deduced r
-
-                        (Just (DBool DFalse)) as false ->
-                            false
-
-                        _ ->
-                            case eval deduced r of
-                                (Just (DBool DFalse)) as false ->
-                                    false
-
-                                _ ->
-                                    Just <| DBool DTrueOrFalse
 
                 Expression.CaseExpression { cases } ->
                     case cases of
@@ -277,10 +214,6 @@ eval deduced expr =
                     -- TODO: implement
                     Nothing
 
-                Expression.OperatorApplication _ _ _ _ ->
-                    -- TODO: implement
-                    Nothing
-
                 Expression.PrefixOperator _ ->
                     Nothing
 
@@ -296,6 +229,102 @@ eval deduced expr =
 
                 Expression.GLSLExpression _ ->
                     Nothing
+
+
+operatorEval : AssocList.Dict Expression Value -> String -> InfixDirection -> Expression -> Expression -> Maybe Value
+operatorEval deduced op assoc l r =
+    case ( op, assoc ) of
+        ( "+", Left ) ->
+            numberOperation2 deduced NumberRange.plus numberFromRanges l r
+
+        ( "-", Left ) ->
+            numberOperation2 deduced NumberRange.minus numberFromRanges l r
+
+        ( "*", Left ) ->
+            -- (Node _ l) (Node _ r) ->
+            -- TODO implement multiplication
+            -- numberOperation2 deduced NumberRange.by l r
+            Nothing
+
+        ( "/", Left ) ->
+            -- (Node _ l) (Node _ r) ->
+            -- TODO implement division
+            -- numberOperation2 deduced NumberRange.divide l r
+            Nothing
+
+        ( "==", Non ) ->
+            Maybe.map2
+                (\lValue rValue ->
+                    DBool <| equals lValue rValue
+                )
+                (eval deduced l)
+                (eval deduced r)
+
+        ( "/=", Non ) ->
+            Maybe.map2
+                (\lValue rValue ->
+                    DBool <| boolValueNot <| equals lValue rValue
+                )
+                (eval deduced l)
+                (eval deduced r)
+
+        ( "||", Right ) ->
+            case eval deduced l of
+                Just (DBool DFalse) ->
+                    eval deduced r
+
+                (Just (DBool DTrue)) as true ->
+                    true
+
+                _ ->
+                    case eval deduced r of
+                        (Just (DBool DTrue)) as true ->
+                            true
+
+                        _ ->
+                            Just <| DBool (DTrueOrFalse "eval ||")
+
+        ( "&&", Right ) ->
+            case eval deduced l of
+                Just (DBool DTrue) ->
+                    eval deduced r
+
+                (Just (DBool DFalse)) as false ->
+                    false
+
+                _ ->
+                    case eval deduced r of
+                        (Just (DBool DFalse)) as false ->
+                            false
+
+                        _ ->
+                            Just <| DBool (DTrueOrFalse "eval &&")
+
+        ( "<", Non ) ->
+            numberOperation2 deduced NumberRange.lessThan combineBoolean l r
+
+        _ ->
+            Debug.todo ("TODO < None" ++ Debug.toString ( op, assoc ))
+
+
+combineBoolean : List (Maybe Bool) -> Maybe Value
+combineBoolean lst =
+    case lst of
+        [] ->
+            Nothing
+
+        h :: t ->
+            List.foldl
+                (\e acc ->
+                    if e == acc then
+                        e
+
+                    else
+                        Nothing
+                )
+                h
+                t
+                |> Maybe.map (toBoolValue >> DBool)
 
 
 numberOperation1 :
@@ -314,21 +343,22 @@ numberOperation1 deduced f l =
 
 numberOperation2 :
     AssocList.Dict Expression Value
-    -> (NumberRange -> NumberRange -> NumberRange)
+    -> (NumberRange -> NumberRange -> r)
+    -> (List r -> Maybe Value)
     -> Expression
     -> Expression
     -> Maybe Value
-numberOperation2 deduced f l r =
+numberOperation2 deduced map fold l r =
     case eval deduced l of
         Just (DNumber lrange lranges) ->
             case eval deduced r of
                 Just (DNumber rrange rranges) ->
                     let
-                        cartesian : List NumberRange -> List NumberRange -> List NumberRange
+                        cartesian : List NumberRange -> List NumberRange -> List r
                         cartesian x y =
-                            List.concatMap (\xe -> List.map (f xe) y) x
+                            List.concatMap (\xe -> List.map (map xe) y) x
                     in
-                    numberFromRanges (cartesian (lrange :: lranges) (rrange :: rranges))
+                    fold (cartesian (lrange :: lranges) (rrange :: rranges))
 
                 _ ->
                     Nothing
@@ -346,8 +376,8 @@ equals l r =
         ( DBool DFalse, DBool rb ) ->
             boolValueNot rb
 
-        ( DBool DTrueOrFalse, DBool _ ) ->
-            DTrueOrFalse
+        ( DBool (DTrueOrFalse _), DBool _ ) ->
+            DTrueOrFalse "equals ToF _"
 
         ( DBool _, _ ) ->
             DFalse
@@ -369,7 +399,7 @@ equals l r =
                     rh :: rt
             in
             if List.any (\le -> List.any (\re -> le == re) rl) ll then
-                DTrueOrFalse
+                DTrueOrFalse "equals str str"
 
             else
                 DFalse
@@ -387,7 +417,7 @@ equals l r =
             DFalse
 
         ( DStringNeitherOf _ _, DStringNeitherOf _ _ ) ->
-            DTrueOrFalse
+            DTrueOrFalse "equals str strne"
 
         ( DNumber lh [], DNumber rh [] ) ->
             case ( NumberRange.isSingleton lh, NumberRange.isSingleton rh ) of
@@ -395,7 +425,12 @@ equals l r =
                     toBoolValue (ln == rn)
 
                 _ ->
-                    Debug.todo ("equals " ++ Debug.toString l ++ " " ++ Debug.toString r)
+                    case NumberRange.intersect lh rh of
+                        Nothing ->
+                            DFalse
+
+                        Just _ ->
+                            DTrueOrFalse "equals number [] number []"
 
         ( DNumber lh lt, DNumber rh rt ) ->
             let
@@ -408,7 +443,7 @@ equals l r =
                     rh :: rt
             in
             if List.any (\le -> List.any (\re -> NumberRange.intersect le re /= Nothing) rl) ll then
-                DTrueOrFalse
+                DTrueOrFalse "equals number number"
 
             else
                 DFalse
@@ -435,8 +470,8 @@ boolValueNot r =
         DFalse ->
             DTrue
 
-        DTrueOrFalse ->
-            DTrueOrFalse
+        DTrueOrFalse from ->
+            DTrueOrFalse from
 
 
 floatToDeduced : Float -> Value
