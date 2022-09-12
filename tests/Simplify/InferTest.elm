@@ -15,13 +15,12 @@ import Value exposing (BooleanValue(..), Value(..))
 
 all : Test
 all =
-    Test.skip <|
-        describe "Infer"
-            [ simpleTests
-            , detailedTests
-            , deduceNewFactsTests
-            , rangeTests
-            ]
+    describe "Infer"
+        [ simpleTests
+        , detailedTests
+        , deduceNewFactsTests
+        , rangeTests
+        ]
 
 
 simpleTests : Test
