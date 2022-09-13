@@ -101,7 +101,6 @@ import Elm.Syntax.Expression as Expression exposing (Expression)
 import Elm.Syntax.Infix exposing (InfixDirection(..))
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range exposing (Range)
-import Elm.Writer
 import NumberRange exposing (NumberRange)
 import Review.ModuleNameLookupTable exposing (ModuleNameLookupTable)
 import Value exposing (BooleanValue(..), Value(..))
@@ -633,69 +632,41 @@ inferOnEquality (Node _ expr) (Node _ other) shouldBe =
 
 inferOnLessThan : Node Expression -> Node Expression -> Bool -> List Fact
 inferOnLessThan (Node _ expr) (Node _ other) shouldBe =
-    debugWith "inferOnLessThan"
-        { expr = exprToString expr
-        , other = exprToString other
-        }
-    <|
-        case expr of
-            Expression.Integer _ ->
-                if shouldBe then
-                    [ LessThan expr other ]
+    case expr of
+        Expression.Integer _ ->
+            if shouldBe then
+                [ LessThan expr other ]
 
-                else
-                    [ LessThanOrEquals other expr ]
+            else
+                [ LessThanOrEquals other expr ]
 
-            Expression.Floatable _ ->
-                if shouldBe then
-                    [ LessThan expr other ]
+        Expression.Floatable _ ->
+            if shouldBe then
+                [ LessThan expr other ]
 
-                else
-                    [ LessThanOrEquals other expr ]
+            else
+                [ LessThanOrEquals other expr ]
 
-            _ ->
-                []
-
-
-exprToString : Expression -> String
-exprToString expr =
-    Elm.Writer.write <|
-        Elm.Writer.writeExpression
-            (Node
-                { start = { row = 0, column = 0 }
-                , end = { row = 0, column = 0 }
-                }
-                expr
-            )
-
-
-debugWith : String -> x -> a -> a
-debugWith msg additional result =
-    --Debug.log (msg ++ " " ++ Debug.toString additional) result
-    result
+        _ ->
+            []
 
 
 inferOnLessThanOrEqual : Node Expression -> Node Expression -> Bool -> List Fact
 inferOnLessThanOrEqual (Node _ expr) (Node _ other) shouldBe =
-    debugWith "inferOnLessThanOrEqual"
-        { expr = exprToString expr
-        , other = exprToString other
-        }
-    <|
-        case expr of
-            Expression.Integer _ ->
-                if shouldBe then
-                    [ LessThanOrEquals expr other ]
+    case expr of
+        Expression.Integer _ ->
+            if shouldBe then
+                [ LessThanOrEquals expr other ]
 
-                else
-                    [ LessThan other expr ]
+            else
+                [ LessThan other expr ]
 
-            Expression.Floatable _ ->
-                if shouldBe then
-                    [ LessThanOrEquals expr other ]
+        Expression.Floatable _ ->
+            if shouldBe then
+                [ LessThanOrEquals expr other ]
 
-                else
-                    [ LessThan other expr ]
+            else
+                [ LessThan other expr ]
 
-            _ ->
-                []
+        _ ->
+            []
