@@ -23,7 +23,7 @@ type Value
 type BooleanValue
     = DTrue
     | DFalse
-    | DTrueOrFalse String
+    | DTrueOrFalse
 
 
 union : Value -> Value -> Maybe Value
@@ -308,7 +308,7 @@ operatorEval deduced op assoc l r =
                             true
 
                         _ ->
-                            Just <| DBool (DTrueOrFalse "eval ||")
+                            Just <| DBool DTrueOrFalse
 
         ( "&&", Right ) ->
             case eval deduced l of
@@ -324,7 +324,7 @@ operatorEval deduced op assoc l r =
                             false
 
                         _ ->
-                            Just <| DBool (DTrueOrFalse "eval &&")
+                            Just <| DBool DTrueOrFalse
 
         ( "<", Non ) ->
             numberOperation2 deduced NumberRange.isLessThan combineBoolean l r
@@ -411,8 +411,8 @@ equals l r =
         ( DBool DFalse, DBool rb ) ->
             boolValueNot rb
 
-        ( DBool (DTrueOrFalse _), DBool _ ) ->
-            DTrueOrFalse "equals ToF _"
+        ( DBool DTrueOrFalse, DBool _ ) ->
+            DTrueOrFalse
 
         ( DBool _, _ ) ->
             DFalse
@@ -452,7 +452,7 @@ equals l r =
             DFalse
 
         ( DStringNeitherOf _ _, DStringNeitherOf _ _ ) ->
-            DTrueOrFalse "equals str strne"
+            DTrueOrFalse
 
         ( DNumber lh [], DNumber rh [] ) ->
             case ( NumberRange.isSingleton lh, NumberRange.isSingleton rh ) of
@@ -465,7 +465,7 @@ equals l r =
                             DFalse
 
                         Just _ ->
-                            DTrueOrFalse "equals number [] number []"
+                            DTrueOrFalse
 
         ( DNumber lh lt, DNumber rh rt ) ->
             let
@@ -478,7 +478,7 @@ equals l r =
                     rh :: rt
             in
             if List.any (\le -> List.any (\re -> NumberRange.intersect le re /= Nothing) rl) ll then
-                DTrueOrFalse "equals number number"
+                DTrueOrFalse
 
             else
                 DFalse
@@ -505,8 +505,8 @@ boolValueNot r =
         DFalse ->
             DTrue
 
-        DTrueOrFalse from ->
-            DTrueOrFalse from
+        DTrueOrFalse ->
+            DTrueOrFalse
 
 
 floatToDeduced : Float -> Value

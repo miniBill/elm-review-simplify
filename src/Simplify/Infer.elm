@@ -154,7 +154,7 @@ get expr (Inferred inferred) =
                     DBool DFalse ->
                         Just falseExpr
 
-                    DBool (DTrueOrFalse _) ->
+                    DBool DTrueOrFalse ->
                         Nothing
 
                     DNumber { from, fromIncluded, to, toIncluded } [] ->
@@ -442,7 +442,7 @@ deduceNewFacts newFact facts =
 equalsFact : Expression -> Expression -> Maybe ( Expression, Value )
 equalsFact a b =
     case Value.eval AssocList.empty a of
-        Just (DBool (DTrueOrFalse _)) ->
+        Just (DBool DTrueOrFalse) ->
             -- Booleans are a special case
             Maybe.map (Tuple.pair a) (Value.eval AssocList.empty b)
 
@@ -462,7 +462,7 @@ notDeduced deducedValue =
         DBool DFalse ->
             Just (DBool DTrue)
 
-        (DBool (DTrueOrFalse _)) as db ->
+        (DBool DTrueOrFalse) as db ->
             Just db
 
         DStringOneOf s o ->
