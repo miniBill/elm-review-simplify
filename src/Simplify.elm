@@ -547,6 +547,7 @@ import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Pattern as Pattern exposing (Pattern)
 import Elm.Syntax.Range as Range exposing (Location, Range)
 import Elm.Type
+import Elm.Writer
 import Json.Decode as Decode
 import Review.Fix as Fix exposing (Fix)
 import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNameLookupTable)
@@ -1357,8 +1358,80 @@ expressionVisitorHelp node context =
                 _ ->
                     onlyErrors []
 
+        Expression.LetExpression { declarations, expression } ->
+            case Node.value expression of
+                Expression.RecordAccess (Node valueRange (Expression.FunctionOrValue [] valueName)) (Node _ field) ->
+                    let
+                        isRecordDefinition le =
+                            case le of
+                                Node _ (Expression.LetFunction { declaration }) ->
+                                    let
+                                        (Node _ declarationValue) =
+                                            declaration
+                                    in
+                                    if Node.value declarationValue.name == valueName then
+                                        Just declarationValue.expression
+
+                                    else
+                                        Nothing
+
+                                Node _ (Expression.LetDestructuring _ _) ->
+                                    Nothing
+                    in
+                    case findMap isRecordDefinition declarations of
+                        Just (Node _ (Expression.RecordUpdateExpression (Node _ record) fields)) ->
+                            case
+                                findMap
+                                    (\(Node _ ( Node _ setterName, setterValue )) ->
+                                        if setterName == field then
+                                            Just setterValue
+
+                                        else
+                                            Nothing
+                                    )
+                                    fields
+                            of
+                                Just (Node _ setterValue) ->
+                                    onlyErrors
+                                        [ Rule.errorWithFix
+                                            { message = "Field access can be simplified"
+                                            , details = [ "This can be replace by the value of the field" ]
+                                            }
+                                            valueRange
+                                            [ Fix.replaceRangeBy (Node.range expression) (expressionToString setterValue) ]
+                                        ]
+
+                                Nothing ->
+                                    onlyErrors
+                                        [ Rule.errorWithFix
+                                            { message = "Field access can be simplified"
+                                            , details = [ "This can be replace by accessing the same field, but on record " ++ record ]
+                                            }
+                                            valueRange
+                                            [ Fix.replaceRangeBy valueRange record ]
+                                        ]
+
+                        Just _ ->
+                            onlyErrors []
+
+                        Nothing ->
+                            onlyErrors []
+
+                _ ->
+                    onlyErrors []
+
         _ ->
             onlyErrors []
+
+
+expressionToString : Expression -> String
+expressionToString expr =
+    let
+        noRange : Range
+        noRange =
+            { start = { row = 0, column = 0 }, end = { row = 0, column = 0 } }
+    in
+    Elm.Writer.write (Elm.Writer.writeExpression (Node noRange expr))
 
 
 distributeFieldAccess : Bool -> String -> Node Expression -> Node String -> List (Error {})
