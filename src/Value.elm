@@ -16,6 +16,7 @@ type Value
     | DStringNeitherOf String (List String)
     | DCharOneOf Char (List Char)
     | DCharNeitherOf Char (List Char)
+      -- A record may be incomplete!
     | DRecord (Dict String Value)
     | DUnit
 
@@ -30,7 +31,7 @@ union : Value -> Value -> Maybe Value
 union l r =
     case ( l, r ) of
         ( DRecord _, DRecord _ ) ->
-            -- TODO: Combine records, BEWARE - only combine if the set of fields is the same
+            -- TODO: Combine records, BEWARE - only combine if the set of fields is exactly the same
             Nothing
 
         ( DRecord _, _ ) ->
@@ -548,8 +549,22 @@ equals l r =
         ( _, DUnit ) ->
             DFalse
 
-        ( DRecord _, DRecord _ ) ->
-            Debug.todo "branch '( DRecord _, DRecord _ )' not implemented"
+        ( DRecord lfs, DRecord rfs ) ->
+            let
+                isIncompatible : ( String, Value ) -> Bool
+                isIncompatible ( lk, lv ) =
+                    case Dict.get lk rfs of
+                        Nothing ->
+                            False
+
+                        Just rv ->
+                            equals lv rv == DFalse
+            in
+            if List.any isIncompatible (Dict.toList lfs) then
+                DFalse
+
+            else
+                DTrueOrFalse
 
         ( DRecord _, _ ) ->
             DFalse
