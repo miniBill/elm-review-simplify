@@ -1,11 +1,12 @@
 module Value exposing (BooleanValue(..), Value(..), eval, union)
 
+-- import Elm.Writer
+
 import AssocList
 import Dict exposing (Dict)
 import Elm.Syntax.Expression as Expression exposing (Expression)
 import Elm.Syntax.Infix exposing (InfixDirection(..))
 import Elm.Syntax.Node as Node exposing (Node(..))
-import Elm.Writer
 import NumberRange exposing (NumberRange)
 import Set
 
@@ -167,21 +168,20 @@ numberFromRanges ranges =
             Just <| DNumber h t
 
 
-exprToString : Expression -> String
-exprToString expr =
-    Elm.Writer.write <|
-        Elm.Writer.writeExpression
-            (Node
-                { start = { row = 0, column = 0 }
-                , end = { row = 0, column = 0 }
-                }
-                expr
-            )
-
-
 eval : AssocList.Dict Expression Value -> Expression -> Maybe Value
 eval deduced expr =
     let
+        -- exprToString : Expression -> String
+        -- exprToString expr =
+        --     Elm.Writer.write <|
+        --         Elm.Writer.writeExpression
+        --             (Node
+        --                 { start = { row = 0, column = 0 }
+        --                 , end = { row = 0, column = 0 }
+        --                 }
+        --                 expr
+        --             )
+        --
         -- _ =
         --     Debug.log "eval"
         --         { deduced =
