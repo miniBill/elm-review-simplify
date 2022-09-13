@@ -586,11 +586,11 @@ rangeTests =
                 case NumberRange.intersect lrange rrange of
                     Nothing ->
                         Expect.false "The intersection is empty so the point should belong to at most one interval"
-                            (Simplify.Infer.belongsTo lrange testPoint && Simplify.Infer.belongsTo rrange testPoint)
+                            (NumberRange.belongsTo lrange testPoint && NumberRange.belongsTo rrange testPoint)
 
                     Just irange ->
                         Expect.true "The intersection is nonempty and the point should belong to it iff it belongs to both intervals"
-                            (Simplify.Infer.belongsTo irange testPoint == (Simplify.Infer.belongsTo lrange testPoint && Simplify.Infer.belongsTo rrange testPoint))
+                            (NumberRange.belongsTo irange testPoint == (NumberRange.belongsTo lrange testPoint && NumberRange.belongsTo rrange testPoint))
             )
         , Test.fuzz3
             rangeFuzzer
@@ -607,14 +607,14 @@ rangeTests =
                         let
                             belongsToUnion : Bool
                             belongsToUnion =
-                                Simplify.Infer.belongsTo irange testPoint
+                                NumberRange.belongsTo irange testPoint
                         in
-                        if Simplify.Infer.belongsTo lrange testPoint then
+                        if NumberRange.belongsTo lrange testPoint then
                             Expect.true
                                 ("The point belong to the left range, so it must belong to the union, but it doesn't - the union is " ++ Debug.toString irange)
                                 belongsToUnion
 
-                        else if Simplify.Infer.belongsTo rrange testPoint then
+                        else if NumberRange.belongsTo rrange testPoint then
                             Expect.true
                                 ("The point belong to the right range, so it must belong to the union, but it doesn't - the union is " ++ Debug.toString irange)
                                 belongsToUnion

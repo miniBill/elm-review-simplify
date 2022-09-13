@@ -1,4 +1,4 @@
-module NumberRange exposing (NumberRange, intersect, isSingleton, lessThan, merge, mergeList, minus, negate, plus, singleton)
+module NumberRange exposing (NumberRange, belongsTo, greaterThan, greaterThanOrEqual, greaterThanOrEquals, infinity, intersect, isGreaterThan, isLessThan, isLessThanOrEqual, isSingleton, lessThan, lessThanOrEquals, merge, mergeList, minus, negInfinity, negate, plus, singleton)
 
 
 type alias NumberRange =
@@ -128,8 +128,8 @@ minus l r =
     plus l (negate r)
 
 
-lessThan : NumberRange -> NumberRange -> Maybe Bool
-lessThan l r =
+isLessThan : NumberRange -> NumberRange -> Maybe Bool
+isLessThan l r =
     if l.to < r.from || ((not l.toIncluded || not r.fromIncluded) && l.to == r.from) then
         Just True
 
@@ -138,3 +138,77 @@ lessThan l r =
 
     else
         Nothing
+
+
+isLessThanOrEqual : NumberRange -> NumberRange -> Maybe Bool
+isLessThanOrEqual l r =
+    if l.to <= r.from then
+        Just True
+
+    else if r.to < l.from then
+        Just False
+
+    else
+        Nothing
+
+
+isGreaterThan : NumberRange -> NumberRange -> Maybe Bool
+isGreaterThan l r =
+    isLessThan r l
+
+
+greaterThanOrEqual : NumberRange -> NumberRange -> Maybe Bool
+greaterThanOrEqual l r =
+    isLessThanOrEqual r l
+
+
+infinity : Float
+infinity =
+    1 / 0
+
+
+negInfinity : Float
+negInfinity =
+    -1 / 0
+
+
+lessThan : Float -> NumberRange
+lessThan float =
+    { from = negInfinity
+    , fromIncluded = False
+    , to = float
+    , toIncluded = False
+    }
+
+
+lessThanOrEquals : Float -> NumberRange
+lessThanOrEquals float =
+    { from = negInfinity
+    , fromIncluded = False
+    , to = float
+    , toIncluded = True
+    }
+
+
+greaterThan : Float -> NumberRange
+greaterThan float =
+    { from = float
+    , fromIncluded = False
+    , to = infinity
+    , toIncluded = False
+    }
+
+
+greaterThanOrEquals : Float -> NumberRange
+greaterThanOrEquals float =
+    { from = float
+    , fromIncluded = True
+    , to = infinity
+    , toIncluded = False
+    }
+
+
+belongsTo : NumberRange -> Float -> Bool
+belongsTo { from, to, fromIncluded, toIncluded } float =
+    (float > from || (float == from && fromIncluded))
+        && (float < to || (float == to && toIncluded))

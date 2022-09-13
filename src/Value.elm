@@ -5,6 +5,7 @@ import Dict exposing (Dict)
 import Elm.Syntax.Expression as Expression exposing (Expression)
 import Elm.Syntax.Infix exposing (InfixDirection(..))
 import Elm.Syntax.Node as Node exposing (Node(..))
+import Elm.Writer
 import NumberRange exposing (NumberRange)
 
 
@@ -61,174 +62,199 @@ numberFromRanges ranges =
             Just <| DNumber h t
 
 
+exprToString : Expression -> String
+exprToString expr =
+    Elm.Writer.write <|
+        Elm.Writer.writeExpression
+            (Node
+                { start = { row = 0, column = 0 }
+                , end = { row = 0, column = 0 }
+                }
+                expr
+            )
+
+
 eval : AssocList.Dict Expression Value -> Expression -> Maybe Value
 eval deduced expr =
-    case AssocList.get expr deduced of
-        Just v ->
-            Just v
+    let
+        -- _ =
+        --     Debug.log "eval"
+        --         { deduced =
+        --             deduced
+        --                 |> AssocList.toList
+        --                 |> List.map (\( k, v ) -> ( exprToString k, v ))
+        --         , expr = exprToString expr
+        --         , result = result
+        --         }
+        result =
+            case AssocList.get expr deduced of
+                Just v ->
+                    Just v
 
-        Nothing ->
-            case expr of
-                Expression.FunctionOrValue [ "Basics" ] "True" ->
-                    Just (DBool DTrue)
+                Nothing ->
+                    case expr of
+                        Expression.FunctionOrValue [ "Basics" ] "True" ->
+                            Just (DBool DTrue)
 
-                Expression.FunctionOrValue [ "Basics" ] "False" ->
-                    Just (DBool DFalse)
+                        Expression.FunctionOrValue [ "Basics" ] "False" ->
+                            Just (DBool DFalse)
 
-                Expression.FunctionOrValue _ _ ->
-                    -- This should have been in the `deduced` dictionary
-                    Nothing
-
-                Expression.Application _ ->
-                    Nothing
-
-                Expression.Integer i ->
-                    Just <| floatToDeduced <| toFloat i
-
-                Expression.Hex h ->
-                    Just <| floatToDeduced <| toFloat h
-
-                Expression.Floatable f ->
-                    Just <| floatToDeduced f
-
-                Expression.Literal s ->
-                    Just <| DStringOneOf s []
-
-                Expression.CharLiteral c ->
-                    Just <| DCharOneOf c []
-
-                Expression.ParenthesizedExpression (Node _ c) ->
-                    eval deduced c
-
-                Expression.LetExpression { expression } ->
-                    -- TODO: use declarations to infer more facts
-                    eval deduced (Node.value expression)
-
-                Expression.IfBlock _ (Node _ thenBranch) (Node _ elseBranch) ->
-                    -- TODO: use condition to infer more facts
-                    thenBranch
-                        |> eval deduced
-                        |> Maybe.andThen
-                            (\thenValue ->
-                                elseBranch
-                                    |> eval deduced
-                                    |> Maybe.andThen
-                                        (\elseValue ->
-                                            union thenValue elseValue
-                                        )
-                            )
-
-                Expression.OperatorApplication op assoc (Node _ l) (Node _ r) ->
-                    operatorEval deduced op assoc l r
-
-                Expression.Negation (Node _ c) ->
-                    numberOperation1 deduced NumberRange.negate c
-
-                Expression.CaseExpression { cases } ->
-                    case cases of
-                        [] ->
+                        Expression.FunctionOrValue _ _ ->
+                            -- This should have been in the `deduced` dictionary
                             Nothing
 
-                        ( _, Node _ h ) :: t ->
-                            List.foldl
-                                (\( _, Node _ caseExpression ) acc ->
-                                    acc
-                                        |> Maybe.andThen
-                                            (\accValue ->
-                                                caseExpression
-                                                    |> eval deduced
-                                                    |> Maybe.andThen
-                                                        (\caseValue ->
-                                                            union accValue caseValue
-                                                        )
-                                            )
-                                )
-                                (eval deduced h)
-                                t
+                        Expression.Application _ ->
+                            Nothing
 
-                Expression.RecordExpr fields ->
-                    fields
-                        |> List.filterMap
-                            (\(Node _ ( Node _ k, Node _ e )) ->
-                                Maybe.map (Tuple.pair k) (eval deduced e)
-                            )
-                        |> Dict.fromList
-                        |> DRecord
-                        |> Just
+                        Expression.Integer i ->
+                            Just <| floatToDeduced <| toFloat i
 
-                Expression.RecordUpdateExpression (Node _ recordName) fields ->
-                    let
-                        recordFields : List ( String, Value )
-                        recordFields =
-                            Expression.FunctionOrValue [] recordName
+                        Expression.Hex h ->
+                            Just <| floatToDeduced <| toFloat h
+
+                        Expression.Floatable f ->
+                            Just <| floatToDeduced f
+
+                        Expression.Literal s ->
+                            Just <| DStringOneOf s []
+
+                        Expression.CharLiteral c ->
+                            Just <| DCharOneOf c []
+
+                        Expression.ParenthesizedExpression (Node _ c) ->
+                            eval deduced c
+
+                        Expression.LetExpression { expression } ->
+                            -- TODO: use declarations to infer more facts
+                            eval deduced (Node.value expression)
+
+                        Expression.IfBlock _ (Node _ thenBranch) (Node _ elseBranch) ->
+                            -- TODO: use condition to infer more facts
+                            thenBranch
                                 |> eval deduced
                                 |> Maybe.andThen
-                                    (\recordValue ->
-                                        case recordValue of
-                                            DRecord fs ->
-                                                Just (Dict.toList fs)
+                                    (\thenValue ->
+                                        elseBranch
+                                            |> eval deduced
+                                            |> Maybe.andThen
+                                                (\elseValue ->
+                                                    union thenValue elseValue
+                                                )
+                                    )
+
+                        Expression.OperatorApplication op assoc (Node _ l) (Node _ r) ->
+                            operatorEval deduced op assoc l r
+
+                        Expression.Negation (Node _ c) ->
+                            numberOperation1 deduced NumberRange.negate c
+
+                        Expression.CaseExpression { cases } ->
+                            case cases of
+                                [] ->
+                                    Nothing
+
+                                ( _, Node _ h ) :: t ->
+                                    List.foldl
+                                        (\( _, Node _ caseExpression ) acc ->
+                                            acc
+                                                |> Maybe.andThen
+                                                    (\accValue ->
+                                                        caseExpression
+                                                            |> eval deduced
+                                                            |> Maybe.andThen
+                                                                (\caseValue ->
+                                                                    union accValue caseValue
+                                                                )
+                                                    )
+                                        )
+                                        (eval deduced h)
+                                        t
+
+                        Expression.RecordExpr fields ->
+                            fields
+                                |> List.filterMap
+                                    (\(Node _ ( Node _ k, Node _ e )) ->
+                                        Maybe.map (Tuple.pair k) (eval deduced e)
+                                    )
+                                |> Dict.fromList
+                                |> DRecord
+                                |> Just
+
+                        Expression.RecordUpdateExpression (Node _ recordName) fields ->
+                            let
+                                recordFields : List ( String, Value )
+                                recordFields =
+                                    Expression.FunctionOrValue [] recordName
+                                        |> eval deduced
+                                        |> Maybe.andThen
+                                            (\recordValue ->
+                                                case recordValue of
+                                                    DRecord fs ->
+                                                        Just (Dict.toList fs)
+
+                                                    _ ->
+                                                        Nothing
+                                            )
+                                        |> Maybe.withDefault []
+
+                                updateFields : List ( String, Value )
+                                updateFields =
+                                    List.filterMap
+                                        (\(Node _ ( Node _ k, Node _ e )) ->
+                                            Maybe.map (Tuple.pair k) (eval deduced e)
+                                        )
+                                        fields
+
+                                combinedFields : List ( String, Value )
+                                combinedFields =
+                                    recordFields ++ updateFields
+                            in
+                            combinedFields
+                                |> Dict.fromList
+                                |> DRecord
+                                |> Just
+
+                        Expression.RecordAccess (Node _ e) (Node _ field) ->
+                            e
+                                |> eval deduced
+                                |> Maybe.andThen
+                                    (\eValue ->
+                                        case eValue of
+                                            DRecord fields ->
+                                                Dict.get field fields
 
                                             _ ->
                                                 Nothing
                                     )
-                                |> Maybe.withDefault []
 
-                        updateFields : List ( String, Value )
-                        updateFields =
-                            List.filterMap
-                                (\(Node _ ( Node _ k, Node _ e )) ->
-                                    Maybe.map (Tuple.pair k) (eval deduced e)
-                                )
-                                fields
+                        Expression.UnitExpr ->
+                            Just DUnit
 
-                        combinedFields : List ( String, Value )
-                        combinedFields =
-                            recordFields ++ updateFields
-                    in
-                    combinedFields
-                        |> Dict.fromList
-                        |> DRecord
-                        |> Just
+                        Expression.ListExpr _ ->
+                            -- TODO: implement
+                            Nothing
 
-                Expression.RecordAccess (Node _ e) (Node _ field) ->
-                    e
-                        |> eval deduced
-                        |> Maybe.andThen
-                            (\eValue ->
-                                case eValue of
-                                    DRecord fields ->
-                                        Dict.get field fields
+                        Expression.TupledExpression _ ->
+                            -- TODO: implement
+                            Nothing
 
-                                    _ ->
-                                        Nothing
-                            )
+                        Expression.PrefixOperator _ ->
+                            Nothing
 
-                Expression.UnitExpr ->
-                    Just DUnit
+                        Expression.Operator _ ->
+                            -- Not possible in practice
+                            Nothing
 
-                Expression.ListExpr _ ->
-                    -- TODO: implement
-                    Nothing
+                        Expression.LambdaExpression _ ->
+                            Nothing
 
-                Expression.TupledExpression _ ->
-                    -- TODO: implement
-                    Nothing
+                        Expression.RecordAccessFunction _ ->
+                            Nothing
 
-                Expression.PrefixOperator _ ->
-                    Nothing
-
-                Expression.Operator _ ->
-                    -- Not possible in practice
-                    Nothing
-
-                Expression.LambdaExpression _ ->
-                    Nothing
-
-                Expression.RecordAccessFunction _ ->
-                    Nothing
-
-                Expression.GLSLExpression _ ->
-                    Nothing
+                        Expression.GLSLExpression _ ->
+                            Nothing
+    in
+    result
 
 
 operatorEval : AssocList.Dict Expression Value -> String -> InfixDirection -> Expression -> Expression -> Maybe Value
@@ -301,7 +327,16 @@ operatorEval deduced op assoc l r =
                             Just <| DBool (DTrueOrFalse "eval &&")
 
         ( "<", Non ) ->
-            numberOperation2 deduced NumberRange.lessThan combineBoolean l r
+            numberOperation2 deduced NumberRange.isLessThan combineBoolean l r
+
+        ( "<=", Non ) ->
+            numberOperation2 deduced NumberRange.isLessThanOrEqual combineBoolean l r
+
+        ( ">", Non ) ->
+            numberOperation2 deduced NumberRange.isGreaterThan combineBoolean l r
+
+        ( ">=", Non ) ->
+            numberOperation2 deduced NumberRange.greaterThanOrEqual combineBoolean l r
 
         _ ->
             Debug.todo ("TODO < None" ++ Debug.toString ( op, assoc ))

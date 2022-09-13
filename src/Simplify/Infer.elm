@@ -2,7 +2,6 @@ module Simplify.Infer exposing
     ( Fact(..)
     , Inferred(..)
     , Resources
-    , belongsTo
     , deduceNewFacts
     , empty
     , falseExpr
@@ -102,6 +101,7 @@ import Elm.Syntax.Expression as Expression exposing (Expression)
 import Elm.Syntax.Infix exposing (InfixDirection(..))
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range exposing (Range)
+import Elm.Writer
 import NumberRange exposing (NumberRange)
 import Review.ModuleNameLookupTable exposing (ModuleNameLookupTable)
 import Value exposing (BooleanValue(..), Value(..))
@@ -112,16 +112,6 @@ type Inferred
         { facts : List Fact
         , deduced : AssocList.Dict Expression Value
         }
-
-
-infinity : Float
-infinity =
-    1 / 0
-
-
-negInfinity : Float
-negInfinity =
-    -1 / 0
 
 
 type Fact
@@ -302,6 +292,21 @@ inferHelp shouldBe node acc =
                 |> injectFacts (inferOnLessThan left right shouldBe)
                 |> injectFacts (inferOnLessThanOrEqual right left (not shouldBe))
 
+        Expression.OperatorApplication "<=" _ left right ->
+            dict
+                |> injectFacts (inferOnLessThanOrEqual left right shouldBe)
+                |> injectFacts (inferOnLessThan right left (not shouldBe))
+
+        Expression.OperatorApplication ">" _ left right ->
+            dict
+                |> injectFacts (inferOnLessThan right left shouldBe)
+                |> injectFacts (inferOnLessThanOrEqual left right (not shouldBe))
+
+        Expression.OperatorApplication ">=" _ left right ->
+            dict
+                |> injectFacts (inferOnLessThanOrEqual right left shouldBe)
+                |> injectFacts (inferOnLessThan left right (not shouldBe))
+
         _ ->
             dict
 
@@ -337,6 +342,40 @@ injectFacts newFacts (Inferred inferred) =
                                             Maybe.map (Tuple.pair e) (notDeduced f)
                                         )
 
+                            LessThan ((Expression.FunctionOrValue [] _) as v) other ->
+                                -- v < o
+                                asNumber other
+                                    |> Maybe.map
+                                        (\o ->
+                                            ( v, DNumber (NumberRange.lessThan o) [] )
+                                        )
+
+                            LessThanOrEquals ((Expression.FunctionOrValue [] _) as v) other ->
+                                -- v <= o
+                                asNumber other
+                                    |> Maybe.map
+                                        (\o ->
+                                            ( v, DNumber (NumberRange.lessThanOrEquals o) [] )
+                                        )
+
+                            LessThan other ((Expression.FunctionOrValue [] _) as v) ->
+                                -- o < v
+                                -- v > o
+                                asNumber other
+                                    |> Maybe.map
+                                        (\o ->
+                                            ( v, DNumber (NumberRange.greaterThan o) [] )
+                                        )
+
+                            LessThanOrEquals other ((Expression.FunctionOrValue [] _) as v) ->
+                                -- o <= v
+                                -- v >= o
+                                asNumber other
+                                    |> Maybe.map
+                                        (\o ->
+                                            ( v, DNumber (NumberRange.greaterThanOrEquals o) [] )
+                                        )
+
                             LessThan _ _ ->
                                 Nothing
 
@@ -360,6 +399,20 @@ injectFacts newFacts (Inferred inferred) =
                                     inferred.deduced
                         }
                     )
+
+
+asNumber : Expression -> Maybe Float
+asNumber expr =
+    Value.eval AssocList.empty expr
+        |> Maybe.andThen
+            (\v ->
+                case v of
+                    DNumber h [] ->
+                        NumberRange.isSingleton h
+
+                    _ ->
+                        Nothing
+            )
 
 
 deduceNewFacts : Fact -> List Fact -> List Fact
@@ -428,23 +481,23 @@ notDeduced deducedValue =
             let
                 invertRange : NumberRange -> List NumberRange
                 invertRange { from, to, fromIncluded, toIncluded } =
-                    (if from > negInfinity then
+                    (if from > NumberRange.negInfinity then
                         [ if fromIncluded then
-                            lessThan from
+                            NumberRange.lessThan from
 
                           else
-                            lessThanOrEquals from
+                            NumberRange.lessThanOrEquals from
                         ]
 
                      else
                         []
                     )
-                        ++ (if to < infinity then
+                        ++ (if to < NumberRange.infinity then
                                 [ if toIncluded then
-                                    moreThan to
+                                    NumberRange.greaterThan to
 
                                   else
-                                    moreThanOrEquals to
+                                    NumberRange.greaterThanOrEquals to
                                 ]
 
                             else
@@ -478,32 +531,6 @@ notDeduced deducedValue =
         DUnit ->
             -- This doesn't really make sense
             Nothing
-
-
-lessThan : Float -> NumberRange
-lessThan float =
-    { from = negInfinity, fromIncluded = False, to = float, toIncluded = False }
-
-
-lessThanOrEquals : Float -> NumberRange
-lessThanOrEquals float =
-    { from = negInfinity, fromIncluded = False, to = float, toIncluded = True }
-
-
-moreThan : Float -> NumberRange
-moreThan float =
-    { from = float, fromIncluded = False, to = infinity, toIncluded = False }
-
-
-moreThanOrEquals : Float -> NumberRange
-moreThanOrEquals float =
-    { from = float, fromIncluded = True, to = infinity, toIncluded = False }
-
-
-belongsTo : NumberRange -> Float -> Bool
-belongsTo { from, to, fromIncluded, toIncluded } float =
-    (float > from || (float == from && fromIncluded))
-        && (float < to || (float == to && toIncluded))
 
 
 mergeEqualFacts : ( Expression, Value ) -> Fact -> List Fact
@@ -563,7 +590,7 @@ areIncompatible value factValue =
 
 isIncompatibleWithRange : Float -> NumberRange -> Bool
 isIncompatibleWithRange float range =
-    not (belongsTo range float)
+    not (NumberRange.belongsTo range float)
 
 
 inferOnEquality : Node Expression -> Node Expression -> Bool -> List Fact
@@ -616,61 +643,69 @@ inferOnEquality (Node _ expr) (Node _ other) shouldBe =
 
 inferOnLessThan : Node Expression -> Node Expression -> Bool -> List Fact
 inferOnLessThan (Node _ expr) (Node _ other) shouldBe =
-    case expr of
-        Expression.Integer int ->
-            let
-                floatExpression : Expression
-                floatExpression =
-                    Expression.Floatable (Basics.toFloat int)
-            in
-            if shouldBe then
-                [ LessThan floatExpression other ]
+    debugWith "inferOnLessThan"
+        { expr = exprToString expr
+        , other = exprToString other
+        }
+    <|
+        case expr of
+            Expression.Integer _ ->
+                if shouldBe then
+                    [ LessThan expr other ]
 
-            else
-                [ LessThanOrEquals other floatExpression ]
+                else
+                    [ LessThanOrEquals other expr ]
 
-        Expression.Floatable float ->
-            let
-                floatExpression : Expression
-                floatExpression =
-                    Expression.Floatable float
-            in
-            if shouldBe then
-                [ LessThan floatExpression other ]
+            Expression.Floatable _ ->
+                if shouldBe then
+                    [ LessThan expr other ]
 
-            else
-                [ LessThanOrEquals other floatExpression ]
+                else
+                    [ LessThanOrEquals other expr ]
 
-        _ ->
-            []
+            _ ->
+                []
+
+
+exprToString : Expression -> String
+exprToString expr =
+    Elm.Writer.write <|
+        Elm.Writer.writeExpression
+            (Node
+                { start = { row = 0, column = 0 }
+                , end = { row = 0, column = 0 }
+                }
+                expr
+            )
+
+
+debugWith : String -> x -> a -> a
+debugWith msg additional result =
+    --Debug.log (msg ++ " " ++ Debug.toString additional) result
+    result
 
 
 inferOnLessThanOrEqual : Node Expression -> Node Expression -> Bool -> List Fact
 inferOnLessThanOrEqual (Node _ expr) (Node _ other) shouldBe =
-    case expr of
-        Expression.Integer int ->
-            let
-                floatExpression : Expression
-                floatExpression =
-                    Expression.Floatable (Basics.toFloat int)
-            in
-            if shouldBe then
-                [ LessThanOrEquals floatExpression other ]
+    debugWith "inferOnLessThanOrEqual"
+        { expr = exprToString expr
+        , other = exprToString other
+        }
+    <|
+        case expr of
+            Expression.Integer _ ->
+                if shouldBe then
+                    [ LessThanOrEquals expr other ]
 
-            else
-                [ LessThan other floatExpression ]
+                else
+                    [ LessThan other expr ]
 
-        Expression.Floatable float ->
-            let
-                floatExpression : Expression
-                floatExpression =
-                    Expression.Floatable float
-            in
-            if shouldBe then
-                [ LessThanOrEquals floatExpression other ]
+            Expression.Floatable _ ->
+                if shouldBe then
+                    [ LessThanOrEquals expr other ]
 
-            else
-                [ LessThan other floatExpression ]
+                else
+                    [ LessThan other expr ]
 
-        _ ->
-            []
+            _ ->
+                []

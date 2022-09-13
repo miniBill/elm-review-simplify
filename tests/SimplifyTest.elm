@@ -3418,6 +3418,60 @@ a =
     3
 """
                         ]
+        , test "should remove branches where the condition always matches (ranges 2)" <|
+            \() ->
+                """module A exposing (..)
+a =
+  if x >= 0 then
+    if x < 0 then
+      1
+    else
+      2
+  else
+    3
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "The condition will always evaluate to False"
+                            , details = [ "The expression can be replaced by what is inside the 'else' branch." ]
+                            , under = "x < 0"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a =
+  if x >= 0 then
+    2
+  else
+    3
+"""
+                        ]
+        , test "should remove branches where the condition always matches (ranges 3)" <|
+            \() ->
+                """module A exposing (..)
+a =
+  if x < 6 then
+    if x < 11 then
+      1
+    else
+      2
+  else
+    3
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "The condition will always evaluate to True"
+                            , details = [ "The expression can be replaced by what is inside the 'then' branch." ]
+                            , under = "x < 11"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a =
+  if x < 6 then
+    1
+  else
+    3
+"""
+                        ]
         , test "should remove branches where the condition never matches (strings == with different values)" <|
             \() ->
                 """module A exposing (..)
