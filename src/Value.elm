@@ -439,8 +439,16 @@ equals l r =
             else
                 DFalse
 
-        ( DStringOneOf _ _, DStringNeitherOf _ _ ) ->
-            Debug.todo ("equals " ++ Debug.toString l ++ " " ++ Debug.toString r)
+        ( DStringOneOf lh lt, DStringNeitherOf rh rt ) ->
+            let
+                rl =
+                    rh :: rt
+            in
+            if List.all (\le -> List.member le rl) (lh :: lt) then
+                DFalse
+
+            else
+                DTrueOrFalse
 
         ( DStringNeitherOf _ _, DStringOneOf _ _ ) ->
             equals r l
