@@ -462,6 +462,48 @@ equals l r =
         ( DStringNeitherOf _ _, DStringNeitherOf _ _ ) ->
             DTrueOrFalse
 
+        ( DStringNeitherOf _ _, _ ) ->
+            DFalse
+
+        ( _, DStringNeitherOf _ _ ) ->
+            DFalse
+
+        ( DCharOneOf lh [], DCharOneOf rh [] ) ->
+            toBoolValue (lh == rh)
+
+        ( DCharOneOf lh lt, DCharOneOf rh rt ) ->
+            let
+                ll : List Char
+                ll =
+                    lh :: lt
+
+                rl : List Char
+                rl =
+                    rh :: rt
+            in
+            if List.any (\le -> List.any (\re -> le == re) rl) ll then
+                DTrueOrFalse
+
+            else
+                DFalse
+
+        ( DCharOneOf lh lt, DCharNeitherOf rh rt ) ->
+            let
+                rl =
+                    rh :: rt
+            in
+            if List.all (\le -> List.member le rl) (lh :: lt) then
+                DFalse
+
+            else
+                DTrueOrFalse
+
+        ( DCharNeitherOf _ _, DCharOneOf _ _ ) ->
+            equals r l
+
+        ( DCharNeitherOf _ _, DCharNeitherOf _ _ ) ->
+            DTrueOrFalse
+
         ( DNumber lh [], DNumber rh [] ) ->
             case ( NumberRange.isSingleton lh, NumberRange.isSingleton rh ) of
                 ( Just ln, Just rn ) ->
@@ -491,8 +533,29 @@ equals l r =
             else
                 DFalse
 
-        _ ->
-            Debug.todo ("equals " ++ Debug.toString l ++ " " ++ Debug.toString r)
+        ( DNumber _ _, _ ) ->
+            DFalse
+
+        ( _, DNumber _ _ ) ->
+            DFalse
+
+        ( DUnit, DUnit ) ->
+            DTrue
+
+        ( DUnit, _ ) ->
+            DFalse
+
+        ( _, DUnit ) ->
+            DFalse
+
+        ( DRecord _, DRecord _ ) ->
+            Debug.todo "branch '( DRecord _, DRecord _ )' not implemented"
+
+        ( DRecord _, _ ) ->
+            DFalse
+
+        ( _, DRecord _ ) ->
+            DFalse
 
 
 toBoolValue : Bool -> BooleanValue
