@@ -4980,17 +4980,76 @@ ifChecks context nodeRange { condition, trueBranch, falseBranch } =
                                 ]
 
                         _ ->
-                            { errors = []
-                            , rangesToIgnore = []
-                            , rightSidesOfPlusPlus = []
-                            , inferredConstants =
-                                Infer.inferForIfCondition
-                                    (Node.value (Normalize.normalize context condition))
-                                    { trueBranchRange = Node.range trueBranch
-                                    , falseBranchRange = Node.range falseBranch
+                            let
+                                default () =
+                                    { errors = []
+                                    , rangesToIgnore = []
+                                    , rightSidesOfPlusPlus = []
+                                    , inferredConstants =
+                                        Infer.inferForIfCondition
+                                            (Node.value (Normalize.normalize context condition))
+                                            { trueBranchRange = Node.range trueBranch
+                                            , falseBranchRange = Node.range falseBranch
+                                            }
+                                            (Tuple.first context.inferredConstants)
                                     }
-                                    (Tuple.first context.inferredConstants)
-                            }
+
+                                toMinMax op l r =
+                                    onlyErrors
+                                        [ Rule.errorWithFix
+                                            { message = "Expression can be simplified to use `" ++ op ++ "`"
+                                            , details = [ "The expression is equivalent to a call to `" ++ op ++ "`" ]
+                                            }
+                                            (targetIfKeyword nodeRange)
+                                            [ Fix.replaceRangeBy
+                                                { start = nodeRange.start
+                                                , end = (Node.range condition).start
+                                                }
+                                                (op ++ " (")
+                                            , Fix.replaceRangeBy { start = (Node.range l).end, end = (Node.range r).start }
+                                                ") ("
+                                            , Fix.replaceRangeBy { start = (Node.range r).end, end = nodeRange.end }
+                                                ")"
+                                            ]
+                                        ]
+
+                                trueFalseEqualsLR l r =
+                                    (Normalize.compare context l trueBranch == Normalize.ConfirmedEquality)
+                                        && (Normalize.compare context r falseBranch == Normalize.ConfirmedEquality)
+
+                                trueFalseEqualsRL r l =
+                                    (Normalize.compare context r trueBranch == Normalize.ConfirmedEquality)
+                                        && (Normalize.compare context l falseBranch == Normalize.ConfirmedEquality)
+                            in
+                            case condition of
+                                Node _ (Expression.OperatorApplication op _ l r) ->
+                                    if op == ">=" || op == ">" then
+                                        if trueFalseEqualsLR l r then
+                                            -- if l >= r then l else r
+                                            toMinMax "max" l r
+
+                                        else if trueFalseEqualsRL r l then
+                                            toMinMax "min" l r
+
+                                        else
+                                            default ()
+
+                                    else if op == "<=" || op == "<" then
+                                        if trueFalseEqualsLR l r then
+                                            -- if l <= r then l else r
+                                            toMinMax "min" l r
+
+                                        else if trueFalseEqualsRL r l then
+                                            toMinMax "max" l r
+
+                                        else
+                                            default ()
+
+                                    else
+                                        default ()
+
+                                _ ->
+                                    default ()
 
 
 

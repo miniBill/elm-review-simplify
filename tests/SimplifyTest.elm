@@ -32,6 +32,7 @@ all =
         , parserTests
         , jsonDecodeTests
         , recordAccessTests
+        , minMaxTests
         ]
 
 
@@ -10632,6 +10633,140 @@ a = (if x then { f = 3 } else if y then {f = 2} else
 a = (if x then { f = 3 }.f else if y then {f = 2}.f else
             case b of Nothing -> { f = 4 }.f
                       Just _ -> { f = 5 }.f)
+"""
+                        ]
+        ]
+
+
+minMaxTests : Test
+minMaxTests =
+    describe "Simplify.min/max"
+        [ test "should simplify to max if possible (>=)" <|
+            \() ->
+                """module A exposing (..)
+a = if item.quality - 1 >= 0 then item.quality - 1 else 0
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "Expression can be simplified to use `max`"
+                            , details = [ "The expression is equivalent to a call to `max`" ]
+                            , under = "if"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a = max (item.quality - 1) (0)
+"""
+                        ]
+        , test "should simplify to max if possible (>)" <|
+            \() ->
+                """module A exposing (..)
+a = if item.quality - 1 > 0 then item.quality - 1 else 0
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "Expression can be simplified to use `max`"
+                            , details = [ "The expression is equivalent to a call to `max`" ]
+                            , under = "if"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a = max (item.quality - 1) (0)
+"""
+                        ]
+        , test "should simplify to max if possible (<)" <|
+            \() ->
+                """module A exposing (..)
+a = if item.quality - 1 < 0 then 0 else item.quality - 1
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "Expression can be simplified to use `max`"
+                            , details = [ "The expression is equivalent to a call to `max`" ]
+                            , under = "if"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a = max (item.quality - 1) (0)
+"""
+                        ]
+        , test "should simplify to max if possible (<=)" <|
+            \() ->
+                """module A exposing (..)
+a = if item.quality - 1 <= 0 then 0 else item.quality - 1
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "Expression can be simplified to use `max`"
+                            , details = [ "The expression is equivalent to a call to `max`" ]
+                            , under = "if"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a = max (item.quality - 1) (0)
+"""
+                        ]
+        , test "should simplify to min if possible (>=)" <|
+            \() ->
+                """module A exposing (..)
+a = if item.quality - 1 >= 0 then 0 else item.quality - 1
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "Expression can be simplified to use `min`"
+                            , details = [ "The expression is equivalent to a call to `min`" ]
+                            , under = "if"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a = min (item.quality - 1) (0)
+"""
+                        ]
+        , test "should simplify to min if possible (>)" <|
+            \() ->
+                """module A exposing (..)
+a = if item.quality - 1 > 0 then 0 else item.quality - 1
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "Expression can be simplified to use `min`"
+                            , details = [ "The expression is equivalent to a call to `min`" ]
+                            , under = "if"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a = min (item.quality - 1) (0)
+"""
+                        ]
+        , test "should simplify to min if possible (<)" <|
+            \() ->
+                """module A exposing (..)
+a = if item.quality - 1 < 0 then item.quality - 1 else 0
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "Expression can be simplified to use `min`"
+                            , details = [ "The expression is equivalent to a call to `min`" ]
+                            , under = "if"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a = min (item.quality - 1) (0)
+"""
+                        ]
+        , test "should simplify to min if possible (<=)" <|
+            \() ->
+                """module A exposing (..)
+a = if item.quality - 1 <= 0 then item.quality - 1 else 0
+"""
+                    |> Review.Test.run (rule defaults)
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "Expression can be simplified to use `min`"
+                            , details = [ "The expression is equivalent to a call to `min`" ]
+                            , under = "if"
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+a = min (item.quality - 1) (0)
 """
                         ]
         ]

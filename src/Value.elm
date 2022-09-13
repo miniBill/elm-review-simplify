@@ -434,7 +434,7 @@ equals l r =
                     rh :: rt
             in
             if List.any (\le -> List.any (\re -> le == re) rl) ll then
-                DTrueOrFalse "equals str str"
+                DTrueOrFalse
 
             else
                 DFalse

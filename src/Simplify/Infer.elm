@@ -342,45 +342,35 @@ injectFacts newFacts (Inferred inferred) =
                                             Maybe.map (Tuple.pair e) (notDeduced f)
                                         )
 
-                            LessThan ((Expression.FunctionOrValue [] _) as v) other ->
-                                -- v < o
-                                asNumber other
-                                    |> Maybe.map
-                                        (\o ->
-                                            ( v, DNumber (NumberRange.lessThan o) [] )
-                                        )
+                            LessThan l r ->
+                                case asNumber l of
+                                    Just ln ->
+                                        -- ln < r
+                                        -- r > ln
+                                        Just ( r, DNumber (NumberRange.greaterThan ln) [] )
 
-                            LessThanOrEquals ((Expression.FunctionOrValue [] _) as v) other ->
-                                -- v <= o
-                                asNumber other
-                                    |> Maybe.map
-                                        (\o ->
-                                            ( v, DNumber (NumberRange.lessThanOrEquals o) [] )
-                                        )
+                                    Nothing ->
+                                        asNumber r
+                                            |> Maybe.map
+                                                (\rn ->
+                                                    -- l < rn
+                                                    ( l, DNumber (NumberRange.lessThan rn) [] )
+                                                )
 
-                            LessThan other ((Expression.FunctionOrValue [] _) as v) ->
-                                -- o < v
-                                -- v > o
-                                asNumber other
-                                    |> Maybe.map
-                                        (\o ->
-                                            ( v, DNumber (NumberRange.greaterThan o) [] )
-                                        )
+                            LessThanOrEquals l r ->
+                                case asNumber l of
+                                    Just ln ->
+                                        -- ln <= r
+                                        -- r >= ln
+                                        Just ( r, DNumber (NumberRange.greaterThanOrEquals ln) [] )
 
-                            LessThanOrEquals other ((Expression.FunctionOrValue [] _) as v) ->
-                                -- o <= v
-                                -- v >= o
-                                asNumber other
-                                    |> Maybe.map
-                                        (\o ->
-                                            ( v, DNumber (NumberRange.greaterThanOrEquals o) [] )
-                                        )
-
-                            LessThan _ _ ->
-                                Nothing
-
-                            LessThanOrEquals _ _ ->
-                                Nothing
+                                    Nothing ->
+                                        asNumber r
+                                            |> Maybe.map
+                                                (\rn ->
+                                                    -- l <= rn
+                                                    ( l, DNumber (NumberRange.lessThanOrEquals rn) [] )
+                                                )
 
                             Or _ _ ->
                                 -- TODO Add "a || b || ..."?
