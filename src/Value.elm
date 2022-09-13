@@ -49,8 +49,111 @@ union l r =
         ( _, DNumber _ _ ) ->
             Nothing
 
-        _ ->
-            Debug.todo ("Value.union " ++ Debug.toString l ++ " " ++ Debug.toString r)
+        ( DUnit, DUnit ) ->
+            Just DUnit
+
+        ( DUnit, _ ) ->
+            Nothing
+
+        ( _, DUnit ) ->
+            Nothing
+
+        ( DBool lb, DBool rb ) ->
+            if lb == rb then
+                Just <| DBool lb
+
+            else
+                Just <| DBool DTrueOrFalse
+
+        ( _, DBool _ ) ->
+            Nothing
+
+        ( DBool _, _ ) ->
+            Nothing
+
+        ( DStringOneOf lh lt, DStringOneOf rh rt ) ->
+            Just <| DStringOneOf lh (rh :: lt ++ rt)
+
+        ( DStringOneOf lh lt, DStringNeitherOf rh rt ) ->
+            let
+                ls =
+                    Set.fromList (lh :: lt)
+
+                rs =
+                    Set.fromList (rh :: rt)
+            in
+            case Set.toList (Set.diff rs ls) of
+                [] ->
+                    Nothing
+
+                ih :: it ->
+                    Just <| DStringNeitherOf ih it
+
+        ( DStringNeitherOf _ _, DStringOneOf _ _ ) ->
+            union r l
+
+        ( DStringNeitherOf lh lt, DStringNeitherOf rh rt ) ->
+            let
+                ls =
+                    Set.fromList (lh :: lt)
+
+                rs =
+                    Set.fromList (rh :: rt)
+            in
+            case Set.toList (Set.intersect ls rs) of
+                [] ->
+                    Nothing
+
+                ih :: it ->
+                    Just <| DStringNeitherOf ih it
+
+        ( DStringOneOf _ _, _ ) ->
+            Nothing
+
+        ( _, DStringOneOf _ _ ) ->
+            Nothing
+
+        ( DStringNeitherOf _ _, _ ) ->
+            Nothing
+
+        ( _, DStringNeitherOf _ _ ) ->
+            Nothing
+
+        ( DCharOneOf lh lt, DCharOneOf rh rt ) ->
+            Just <| DCharOneOf lh (rh :: lt ++ rt)
+
+        ( DCharOneOf lh lt, DCharNeitherOf rh rt ) ->
+            let
+                ls =
+                    Set.fromList (lh :: lt)
+
+                rs =
+                    Set.fromList (rh :: rt)
+            in
+            case Set.toList (Set.diff rs ls) of
+                [] ->
+                    Nothing
+
+                ih :: it ->
+                    Just <| DCharNeitherOf ih it
+
+        ( DCharNeitherOf _ _, DCharOneOf _ _ ) ->
+            union r l
+
+        ( DCharNeitherOf lh lt, DCharNeitherOf rh rt ) ->
+            let
+                ls =
+                    Set.fromList (lh :: lt)
+
+                rs =
+                    Set.fromList (rh :: rt)
+            in
+            case Set.toList (Set.intersect ls rs) of
+                [] ->
+                    Nothing
+
+                ih :: it ->
+                    Just <| DCharNeitherOf ih it
 
 
 numberFromRanges : List NumberRange -> Maybe Value
