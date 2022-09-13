@@ -7,6 +7,7 @@ import Elm.Syntax.Infix exposing (InfixDirection(..))
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Writer
 import NumberRange exposing (NumberRange)
+import Set
 
 
 type Value
@@ -246,8 +247,8 @@ eval deduced expr =
                                                 )
                                     )
 
-                        Expression.OperatorApplication op assoc (Node _ l) (Node _ r) ->
-                            operatorEval deduced op assoc l r
+                        Expression.OperatorApplication op _ (Node _ l) (Node _ r) ->
+                            operatorEval deduced op l r
 
                         Expression.Negation (Node _ c) ->
                             numberOperation1 deduced NumberRange.negate c
@@ -361,28 +362,31 @@ eval deduced expr =
     result
 
 
-operatorEval : AssocList.Dict Expression Value -> String -> InfixDirection -> Expression -> Expression -> Maybe Value
-operatorEval deduced op assoc l r =
-    case ( op, assoc ) of
-        ( "+", Left ) ->
+operatorEval : AssocList.Dict Expression Value -> String -> Expression -> Expression -> Maybe Value
+operatorEval deduced op l r =
+    case op of
+        "+" ->
             numberOperation2 deduced NumberRange.plus numberFromRanges l r
 
-        ( "-", Left ) ->
+        "-" ->
             numberOperation2 deduced NumberRange.minus numberFromRanges l r
 
-        ( "*", Left ) ->
-            -- (Node _ l) (Node _ r) ->
+        "*" ->
             -- TODO implement multiplication
             -- numberOperation2 deduced NumberRange.by l r
             Nothing
 
-        ( "/", Left ) ->
-            -- (Node _ l) (Node _ r) ->
+        "/" ->
             -- TODO implement division
             -- numberOperation2 deduced NumberRange.divide l r
             Nothing
 
-        ( "==", Non ) ->
+        "//" ->
+            -- TODO implement division
+            -- numberOperation2 deduced NumberRange.divide l r
+            Nothing
+
+        "==" ->
             Maybe.map2
                 (\lValue rValue ->
                     DBool <| equals lValue rValue
@@ -390,7 +394,7 @@ operatorEval deduced op assoc l r =
                 (eval deduced l)
                 (eval deduced r)
 
-        ( "/=", Non ) ->
+        "/=" ->
             Maybe.map2
                 (\lValue rValue ->
                     DBool <| boolValueNot <| equals lValue rValue
@@ -398,7 +402,7 @@ operatorEval deduced op assoc l r =
                 (eval deduced l)
                 (eval deduced r)
 
-        ( "||", Right ) ->
+        "||" ->
             case eval deduced l of
                 Just (DBool DFalse) ->
                     eval deduced r
@@ -414,7 +418,7 @@ operatorEval deduced op assoc l r =
                         _ ->
                             Just <| DBool DTrueOrFalse
 
-        ( "&&", Right ) ->
+        "&&" ->
             case eval deduced l of
                 Just (DBool DTrue) ->
                     eval deduced r
@@ -430,20 +434,20 @@ operatorEval deduced op assoc l r =
                         _ ->
                             Just <| DBool DTrueOrFalse
 
-        ( "<", Non ) ->
+        "<" ->
             numberOperation2 deduced NumberRange.isLessThan combineBoolean l r
 
-        ( "<=", Non ) ->
+        "<=" ->
             numberOperation2 deduced NumberRange.isLessThanOrEqual combineBoolean l r
 
-        ( ">", Non ) ->
+        ">" ->
             numberOperation2 deduced NumberRange.isGreaterThan combineBoolean l r
 
-        ( ">=", Non ) ->
+        ">=" ->
             numberOperation2 deduced NumberRange.greaterThanOrEqual combineBoolean l r
 
         _ ->
-            Debug.todo ("TODO < None" ++ Debug.toString ( op, assoc ))
+            Nothing
 
 
 combineBoolean : List (Maybe Bool) -> Maybe Value
