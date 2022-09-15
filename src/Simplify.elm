@@ -5084,17 +5084,38 @@ ifChecks context nodeRange { condition, trueBranch, falseBranch } =
                         _ ->
                             let
                                 default () =
-                                    { errors = []
-                                    , rangesToIgnore = []
-                                    , rightSidesOfPlusPlus = []
-                                    , inferredConstants =
-                                        Infer.inferForIfCondition
-                                            (Node.value (Normalize.normalize context condition))
-                                            { trueBranchRange = Node.range trueBranch
-                                            , falseBranchRange = Node.range falseBranch
+                                    case Normalize.compare context condition falseBranch of
+                                        Normalize.ConfirmedEquality ->
+                                            onlyErrors
+                                                [ Rule.errorWithFix
+                                                    { message = "if can be simplified to a conjunction"
+                                                    , details = [ "The expression is equivalent to (the condition && the true branch)" ]
+                                                    }
+                                                    (targetIfKeyword nodeRange)
+                                                    [ Fix.replaceRangeBy
+                                                        { start = nodeRange.start
+                                                        , end = (Node.range condition).start
+                                                        }
+                                                        "("
+                                                    , Fix.replaceRangeBy { start = (Node.range condition).end, end = (Node.range trueBranch).start }
+                                                        ") && ("
+                                                    , Fix.replaceRangeBy { start = (Node.range trueBranch).end, end = nodeRange.end }
+                                                        ")"
+                                                    ]
+                                                ]
+
+                                        _ ->
+                                            { errors = []
+                                            , rangesToIgnore = []
+                                            , rightSidesOfPlusPlus = []
+                                            , inferredConstants =
+                                                Infer.inferForIfCondition
+                                                    (Node.value (Normalize.normalize context condition))
+                                                    { trueBranchRange = Node.range trueBranch
+                                                    , falseBranchRange = Node.range falseBranch
+                                                    }
+                                                    (Tuple.first context.inferredConstants)
                                             }
-                                            (Tuple.first context.inferredConstants)
-                                    }
 
                                 toMinMax op l r =
                                     onlyErrors
