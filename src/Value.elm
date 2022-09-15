@@ -1,4 +1,4 @@
-module Value exposing (BooleanValue(..), Value(..), eval, union)
+module Value exposing (BooleanValue(..), Value(..), eval, isSingleon, singleValueToString, union)
 
 -- import Elm.Writer
 
@@ -705,3 +705,58 @@ boolValueNot r =
 floatToDeduced : Float -> Value
 floatToDeduced float =
     DNumber (NumberRange.singleton float) []
+
+
+type SingleValue
+    = SFloat Float
+    | SString String
+    | SChar Char
+    | SBool Bool
+    | SUnit
+
+
+isSingleon : Value -> Maybe SingleValue
+isSingleon val =
+    case val of
+        DBool DTrue ->
+            Just <| SBool True
+
+        DBool DFalse ->
+            Just <| SBool False
+
+        DNumber r [] ->
+            Maybe.map SFloat <| NumberRange.isSingleton r
+
+        DStringOneOf s [] ->
+            Just <| SString s
+
+        DCharOneOf c [] ->
+            Just <| SChar c
+
+        DUnit ->
+            Just SUnit
+
+        _ ->
+            Nothing
+
+
+singleValueToString : SingleValue -> String
+singleValueToString sv =
+    case sv of
+        SFloat f ->
+            String.fromFloat f
+
+        SString s ->
+            "\"" ++ s ++ "\""
+
+        SChar c ->
+            "'" ++ String.fromChar c ++ "'"
+
+        SBool True ->
+            "True"
+
+        SBool False ->
+            "False"
+
+        SUnit ->
+            "()"

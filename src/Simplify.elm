@@ -549,6 +549,7 @@ import Elm.Syntax.Range as Range exposing (Location, Range)
 import Elm.Type
 import Elm.Writer
 import Json.Decode as Decode
+import NumberRange
 import Review.Fix as Fix exposing (Fix)
 import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNameLookupTable)
 import Review.Project.Dependency as Dependency exposing (Dependency)
@@ -556,10 +557,11 @@ import Review.Rule as Rule exposing (Error, Rule)
 import Set exposing (Set)
 import Simplify.AstHelpers as AstHelpers
 import Simplify.Evaluate as Evaluate
-import Simplify.Infer as Infer
+import Simplify.Infer as Infer exposing (Inferred(..))
 import Simplify.Match as Match exposing (Match(..))
 import Simplify.Normalize as Normalize
 import Simplify.RangeDict as RangeDict exposing (RangeDict)
+import Value
 
 
 {-| Rule to simplify Elm code.
@@ -1019,6 +1021,28 @@ onlyErrors errors =
     }
 
 
+tryEval : Node Expression -> ModuleContext -> Maybe { errors : List (Error {}), rangesToIgnore : List Range, rightSidesOfPlusPlus : List Range, inferredConstants : List ( Range, Infer.Inferred ) }
+tryEval (Node nodeRange nodeValue) context =
+    Value.eval ((\( Inferred { deduced }, _ ) -> deduced) context.inferredConstants) nodeValue
+        |> Maybe.andThen Value.isSingleon
+        |> Maybe.map
+            (\singleValue ->
+                onlyErrors
+                    [ Rule.errorWithFix
+                        { message = "Expression can be simplified"
+                        , details =
+                            [ "This expression can be simplified to its value"
+                            ]
+                        }
+                        nodeRange
+                        [ Fix.replaceRangeBy
+                            nodeRange
+                            (Value.singleValueToString singleValue)
+                        ]
+                    ]
+            )
+
+
 expressionVisitorHelp : Node Expression -> ModuleContext -> { errors : List (Error {}), rangesToIgnore : List Range, rightSidesOfPlusPlus : List Range, inferredConstants : List ( Range, Infer.Inferred ) }
 expressionVisitorHelp node context =
     case Node.value node of
@@ -1289,32 +1313,37 @@ expressionVisitorHelp node context =
                 )
 
         Expression.OperatorApplication operator _ left right ->
-            case Dict.get operator operatorChecks of
-                Just checkFn ->
-                    { errors =
-                        checkFn
-                            { lookupTable = context.lookupTable
-                            , inferredConstants = context.inferredConstants
-                            , parentRange = Node.range node
-                            , operator = operator
-                            , left = left
-                            , leftRange = Node.range left
-                            , right = right
-                            , rightRange = Node.range right
-                            , isOnTheRightSideOfPlusPlus = List.member (Node.range node) context.rightSidesOfPlusPlus
-                            }
-                    , rangesToIgnore = []
-                    , rightSidesOfPlusPlus =
-                        if operator == "++" then
-                            [ Node.range <| AstHelpers.removeParens right ]
-
-                        else
-                            []
-                    , inferredConstants = []
-                    }
+            case tryEval node context of
+                Just errs ->
+                    errs
 
                 Nothing ->
-                    onlyErrors []
+                    case Dict.get operator operatorChecks of
+                        Just checkFn ->
+                            { errors =
+                                checkFn
+                                    { lookupTable = context.lookupTable
+                                    , inferredConstants = context.inferredConstants
+                                    , parentRange = Node.range node
+                                    , operator = operator
+                                    , left = left
+                                    , leftRange = Node.range left
+                                    , right = right
+                                    , rightRange = Node.range right
+                                    , isOnTheRightSideOfPlusPlus = List.member (Node.range node) context.rightSidesOfPlusPlus
+                                    }
+                            , rangesToIgnore = []
+                            , rightSidesOfPlusPlus =
+                                if operator == "++" then
+                                    [ Node.range <| AstHelpers.removeParens right ]
+
+                                else
+                                    []
+                            , inferredConstants = []
+                            }
+
+                        Nothing ->
+                            onlyErrors []
 
         Expression.Negation baseExpr ->
             case AstHelpers.removeParens baseExpr of
