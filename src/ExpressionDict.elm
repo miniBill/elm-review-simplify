@@ -34,236 +34,182 @@ comparer l r =
 
 compareExpression : Node Expression -> Node Expression -> Order
 compareExpression (Node _ l) (Node _ r) =
-    case ( l, r ) of
-        ( UnitExpr, UnitExpr ) ->
-            EQ
+    case compare (dollar l) (dollar r) of
+        EQ ->
+            case ( l, r ) of
+                ( UnitExpr, UnitExpr ) ->
+                    EQ
 
-        ( UnitExpr, _ ) ->
-            LT
+                ( TupledExpression lc, TupledExpression rc ) ->
+                    compareList compareExpression lc rc
 
-        ( _, UnitExpr ) ->
-            GT
+                ( Application lc, Application rc ) ->
+                    compareList compareExpression lc rc
 
-        ( TupledExpression lc, TupledExpression rc ) ->
-            compareList compareExpression lc rc
+                ( OperatorApplication lo _ ll lr, OperatorApplication ro _ rl rr ) ->
+                    case compare lo ro of
+                        EQ ->
+                            compareList compareExpression [ ll, lr ] [ rl, rr ]
 
-        ( TupledExpression _, _ ) ->
-            LT
+                        res ->
+                            res
 
-        ( _, TupledExpression _ ) ->
-            GT
+                ( FunctionOrValue lmod lname, FunctionOrValue rmod rname ) ->
+                    case compare lmod rmod of
+                        EQ ->
+                            compare lname rname
 
-        ( Application lc, Application rc ) ->
-            compareList compareExpression lc rc
+                        res ->
+                            res
 
-        ( Application _, _ ) ->
-            LT
+                ( IfBlock lc lt lf, IfBlock rc rt rf ) ->
+                    compareList compareExpression [ lc, lt, lf ] [ rc, rt, rf ]
 
-        ( _, Application _ ) ->
-            GT
+                ( PrefixOperator lo, PrefixOperator ro ) ->
+                    compare lo ro
 
-        ( OperatorApplication lo _ ll lr, OperatorApplication ro _ rl rr ) ->
-            case compare lo ro of
-                EQ ->
-                    compareList compareExpression [ ll, lr ] [ rl, rr ]
+                ( Operator lo, Operator ro ) ->
+                    compare lo ro
 
-                res ->
-                    res
+                ( Integer li, Integer ri ) ->
+                    compare li ri
 
-        ( OperatorApplication _ _ _ _, _ ) ->
-            LT
+                ( Hex lh, Hex rh ) ->
+                    compare lh rh
 
-        ( _, OperatorApplication _ _ _ _ ) ->
-            GT
-
-        ( FunctionOrValue lmod lname, FunctionOrValue rmod rname ) ->
-            case compare lmod rmod of
-                EQ ->
-                    compare lname rname
-
-                res ->
-                    res
-
-        ( FunctionOrValue _ _, _ ) ->
-            LT
-
-        ( _, FunctionOrValue _ _ ) ->
-            GT
-
-        ( IfBlock lc lt lf, IfBlock rc rt rf ) ->
-            compareList compareExpression [ lc, lt, lf ] [ rc, rt, rf ]
-
-        ( IfBlock _ _ _, _ ) ->
-            LT
-
-        ( _, IfBlock _ _ _ ) ->
-            GT
-
-        ( PrefixOperator lo, PrefixOperator ro ) ->
-            compare lo ro
-
-        ( PrefixOperator _, _ ) ->
-            LT
-
-        ( _, PrefixOperator _ ) ->
-            GT
-
-        ( Operator lo, Operator ro ) ->
-            compare lo ro
-
-        ( Operator _, _ ) ->
-            LT
-
-        ( _, Operator _ ) ->
-            GT
-
-        ( Integer li, Integer ri ) ->
-            compare li ri
-
-        ( Integer _, _ ) ->
-            LT
-
-        ( _, Integer _ ) ->
-            GT
-
-        ( Hex lh, Hex rh ) ->
-            compare lh rh
-
-        ( Hex _, _ ) ->
-            LT
-
-        ( _, Hex _ ) ->
-            GT
-
-        ( Floatable lf, Floatable rf ) ->
-            compare lf rf
-
-        ( Floatable _, _ ) ->
-            LT
-
-        ( _, Floatable _ ) ->
-            GT
-
-        ( Negation lc, Negation rc ) ->
-            compareExpression lc rc
-
-        ( Negation _, _ ) ->
-            LT
-
-        ( _, Negation _ ) ->
-            GT
-
-        ( Literal ll, Literal rl ) ->
-            compare ll rl
-
-        ( Literal _, _ ) ->
-            LT
-
-        ( _, Literal _ ) ->
-            GT
-
-        ( CharLiteral ll, CharLiteral rl ) ->
-            compare ll rl
-
-        ( CharLiteral _, _ ) ->
-            LT
-
-        ( _, CharLiteral _ ) ->
-            GT
-
-        ( ParenthesizedExpression lc, ParenthesizedExpression rc ) ->
-            compareExpression lc rc
-
-        ( ParenthesizedExpression _, _ ) ->
-            LT
-
-        ( _, ParenthesizedExpression _ ) ->
-            GT
-
-        ( ListExpr lc, ListExpr rc ) ->
-            compareList compareExpression lc rc
-
-        ( ListExpr _, _ ) ->
-            LT
-
-        ( _, ListExpr _ ) ->
-            GT
-
-        ( RecordExpr lc, RecordExpr rc ) ->
-            compareList compareRecordSetter lc rc
-
-        ( RecordExpr _, _ ) ->
-            LT
-
-        ( _, RecordExpr _ ) ->
-            GT
-
-        ( LetExpression lc, LetExpression rc ) ->
-            compareLetBlocks lc rc
-
-        ( LetExpression _, _ ) ->
-            LT
-
-        ( _, LetExpression _ ) ->
-            GT
-
-        ( CaseExpression lc, CaseExpression rc ) ->
-            compareCaseBlocks lc rc
-
-        ( CaseExpression _, _ ) ->
-            LT
-
-        ( _, CaseExpression _ ) ->
-            GT
-
-        ( LambdaExpression lc, LambdaExpression rc ) ->
-            compareLambda lc rc
-
-        ( LambdaExpression _, _ ) ->
-            LT
-
-        ( _, LambdaExpression _ ) ->
-            GT
-
-        ( RecordAccess ln (Node _ lf), RecordAccess rn (Node _ rf) ) ->
-            case compareExpression ln rn of
-                EQ ->
+                ( Floatable lf, Floatable rf ) ->
                     compare lf rf
 
-                res ->
-                    res
+                ( Negation lc, Negation rc ) ->
+                    compareExpression lc rc
 
-        ( RecordAccess _ _, _ ) ->
-            LT
+                ( Literal ll, Literal rl ) ->
+                    compare ll rl
 
-        ( _, RecordAccess _ _ ) ->
-            GT
+                ( CharLiteral ll, CharLiteral rl ) ->
+                    compare ll rl
 
-        ( RecordAccessFunction lf, RecordAccessFunction rf ) ->
-            compare lf rf
+                ( ParenthesizedExpression lc, ParenthesizedExpression rc ) ->
+                    compareExpression lc rc
 
-        ( RecordAccessFunction _, _ ) ->
-            LT
+                ( ListExpr lc, ListExpr rc ) ->
+                    compareList compareExpression lc rc
 
-        ( _, RecordAccessFunction _ ) ->
-            GT
-
-        ( RecordUpdateExpression (Node _ ln) lc, RecordUpdateExpression (Node _ rn) rc ) ->
-            case compare ln rn of
-                EQ ->
+                ( RecordExpr lc, RecordExpr rc ) ->
                     compareList compareRecordSetter lc rc
 
-                res ->
-                    res
+                ( LetExpression lc, LetExpression rc ) ->
+                    compareLetBlocks lc rc
 
-        ( RecordUpdateExpression _ _, _ ) ->
-            LT
+                ( CaseExpression lc, CaseExpression rc ) ->
+                    compareCaseBlocks lc rc
 
-        ( _, RecordUpdateExpression _ _ ) ->
-            GT
+                ( LambdaExpression lc, LambdaExpression rc ) ->
+                    compareLambda lc rc
 
-        ( GLSLExpression lc, GLSLExpression rc ) ->
-            compare lc rc
+                ( RecordAccess ln (Node _ lf), RecordAccess rn (Node _ rf) ) ->
+                    case compareExpression ln rn of
+                        EQ ->
+                            compare lf rf
+
+                        res ->
+                            res
+
+                ( RecordAccessFunction lf, RecordAccessFunction rf ) ->
+                    compare lf rf
+
+                ( RecordUpdateExpression (Node _ ln) lc, RecordUpdateExpression (Node _ rn) rc ) ->
+                    case compare ln rn of
+                        EQ ->
+                            compareList compareRecordSetter lc rc
+
+                        res ->
+                            res
+
+                ( GLSLExpression lc, GLSLExpression rc ) ->
+                    compare lc rc
+
+                _ ->
+                    EQ
+
+        res ->
+            res
+
+
+dollar : Expression -> Int
+dollar e =
+    case e of
+        UnitExpr ->
+            0
+
+        Application _ ->
+            1
+
+        OperatorApplication _ _ _ _ ->
+            2
+
+        FunctionOrValue _ _ ->
+            3
+
+        IfBlock _ _ _ ->
+            4
+
+        PrefixOperator _ ->
+            5
+
+        Operator _ ->
+            6
+
+        Integer _ ->
+            7
+
+        Hex _ ->
+            8
+
+        Floatable _ ->
+            9
+
+        Negation _ ->
+            10
+
+        Literal _ ->
+            11
+
+        CharLiteral _ ->
+            12
+
+        TupledExpression _ ->
+            13
+
+        ParenthesizedExpression _ ->
+            14
+
+        LetExpression _ ->
+            15
+
+        CaseExpression _ ->
+            16
+
+        LambdaExpression _ ->
+            17
+
+        RecordExpr _ ->
+            18
+
+        ListExpr _ ->
+            19
+
+        RecordAccess _ _ ->
+            20
+
+        RecordAccessFunction _ ->
+            21
+
+        RecordUpdateExpression _ _ ->
+            22
+
+        GLSLExpression _ ->
+            23
 
 
 compareLambda : Expression.Lambda -> Expression.Lambda -> Order
